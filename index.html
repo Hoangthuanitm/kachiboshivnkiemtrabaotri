@@ -1191,23 +1191,14 @@ function calDay(L) {
 function vData() {
   $('#view').innerHTML = `
   <div class="dgrid">
-    <section class="card"><h3>${ic('cloud')}${t('Đồng bộ đám mây')}</h3><p>${t('Mọi thay đổi được lưu lên Firestore và tự cập nhật trên tất cả laptop, tablet, điện thoại đang mở app.')}</p>
-      <p class="small">${t('Collection: {c}', { c: COLLECTION })}</p><div class="row small" id="sync2"></div></section>
     <section class="card"><h3>${ic('up')}${t('Nhập từ Excel')}</h3><p>${t('Chọn file Excel cùng cấu trúc "LỊCH SỬ BẢO TRÌ MÁY PVC.xlsx" (sheet nhật kí, bảo trì, máy lạnh). Toàn bộ dữ liệu hiện tại sẽ được thay thế.')}</p>
       <div class="row"><label class="btn pri">${ic('up')}${t('Chọn file .xlsx')}<input type="file" accept=".xlsx,.xls" id="fx" hidden></label></div></section>
     <section class="card"><h3>${ic('down')}${t('Xuất ra Excel')}</h3><p>${t('Xuất 3 sheet: Thiết bị, Kế hoạch (kèm hạn kế tiếp), Nhật ký. Dùng để báo cáo hoặc lưu trữ.')}</p>
       <div class="row"><button class="btn pri" data-act="export-all">${ic('down')}${t('Xuất Excel')}</button></div></section>
     <section class="card"><h3>${ic('print')}${t('Báo cáo tháng')}</h3><p>${t('In hoặc lưu PDF báo cáo bảo trì của một tháng: tổng hợp, nhật ký, việc quá hạn.')}</p>
       <div class="row wrap"><input type="month" id="rpm" value="${today().slice(0, 7)}"><button class="btn pri" data-act="print-month">${ic('print')}${t('In báo cáo')}</button></div></section>
-    <section class="card"><h3>${ic('db')}${t('Sao lưu dữ liệu')}</h3><p>${t('Tải file sao lưu (.json) chứa toàn bộ dữ liệu. Dữ liệu đã lưu trên Firestore, file này dùng để lưu trữ thêm.')}</p>
-      <div class="row wrap"><button class="btn pri" data-act="backup">${ic('down')}${t('Tải bản sao lưu')}</button><label class="btn">${ic('up')}${t('Khôi phục')}<input type="file" accept=".json" id="fj" hidden></label></div></section>
-    <section class="card"><h3>${ic('reset')}${t('Dữ liệu mẫu')}</h3><p>${t('Xóa dữ liệu hiện tại và nạp lại dữ liệu gốc lấy từ file Excel đính kèm ban đầu.')}</p>
-      <div class="row"><button class="btn del" data-act="reset">${ic('reset')}${t('Nạp lại dữ liệu mẫu')}</button></div></section>
-  </div>
-  <p class="muted small" style="margin-top:16px">${t('Hiện có {e} thiết bị · {p} kế hoạch · {l} bản ghi nhật ký.', { e: db.equipment.length, p: db.plans.length, l: db.logs.length })}</p>`;
-  $('#sync2').innerHTML = $('#sync').innerHTML.replace(/^·\s*/, '');
+  </div>`;
   $('#fx').onchange = ev => importExcel(ev.target.files[0]);
-  $('#fj').onchange = ev => restore(ev.target.files[0]);
 }
 const needX = () => { if (typeof XLSX === 'undefined') { toast(t('Cần kết nối Internet để dùng chức năng Excel')); return false; } return true; };
 function replaceAll(nd, msg) { db = nd; save(); render(); toast(msg); }
@@ -1243,18 +1234,6 @@ function exportAll() {
     [t('Kế hoạch'), db.plans.map(p => { const i = planInfo(p), dl = FREQ[p.freq]?.daily; return { [t('Thiết bị')]: eqName(p.equipId), [t('Hạng mục')]: t(p.task), [t('Chu kỳ')]: fq(p), [t('Lần gần nhất')]: fmt(p.lastDone), [t('Hạn kế tiếp')]: dl ? t('Hằng ngày') : fmt(i.due), [t('Trạng thái')]: dl ? '' : ST[i.st].t(i.diff) }; })],
     [t('Nhật ký'), [...db.logs].sort((a, b) => b.date.localeCompare(a.date)).map(logRow)],
   ], `Kachiboshi_BaoTri_${today()}.xlsx`);
-}
-function restore(file) {
-  if (!file) return;
-  const r = new FileReader();
-  r.onload = () => {
-    try {
-      const d = JSON.parse(r.result); if (!Array.isArray(d.equipment) || !Array.isArray(d.logs)) throw new Error('format');
-      if (!confirm(t('Khôi phục sẽ thay thế toàn bộ dữ liệu hiện tại. Tiếp tục?'))) return;
-      replaceAll({ ...emptyDb(), ...d }, t('Đã khôi phục dữ liệu'));
-    } catch (e) { toast(t('File sao lưu không hợp lệ')); }
-  };
-  r.readAsText(file);
 }
 function printMonth() {
   const m = $('#rpm').value || today().slice(0, 7), [y, mo] = m.split('-');
@@ -1432,8 +1411,6 @@ document.addEventListener('click', e => {
     case 'clear-f': Object.assign(ui.nhatky, { q: '', eq: '', type: '', who: '', from: '', to: '' }); vLogs(); break;
     case 'export-logs': if (needX()) { const r = filteredLogs(); if (!r.length) toast(t('Không có bản ghi để xuất')); else writeBook([[t('Nhật ký'), r.map(logRow)]], `NhatKy_BaoTri_${today()}.xlsx`); } break;
     case 'export-all': exportAll(); break;
-    case 'backup': download(`Kachiboshi_SaoLuu_${today()}.json`, new Blob([JSON.stringify(db, null, 1)], { type: 'application/json' })); toast(t('Đã tải bản sao lưu')); break;
-    case 'reset': if (confirm(t('Xóa toàn bộ dữ liệu hiện tại và nạp lại dữ liệu mẫu?'))) replaceAll(buildFromSheets(SEED), t('Đã nạp lại dữ liệu mẫu')); break;
     case 'print-month': printMonth(); break;
     case 'cal-mode': c.mode = d.v; vCal(); break;
     case 'cal-today': c.ref = c.sel = today(); calBody(); break;
