@@ -446,11 +446,11 @@ VIEWS.home = {live: true, html(){
   if (isMgr()){
     const devs = Object.values(S.dev), logs = S.logsMonth, ontime = logs.filter(l => !l.late).length;
     const openInc = Object.values(S.incOpen);
-    h += '<h3>' + esc(T("Tổng quan")) + '</h3><div class="stats">' +
-      stat(devs.filter(d => d.status !== "off").length, T("Thiết bị đang quản lý")) +
-      stat(devs.filter(d => d.status === "broken").length, T("Thiết bị hỏng"), "var(--r)") +
+    h += '<h3>' + esc(T("Tổng quan thiết bị")) + '</h3><div class="stats">' +
+      stat(devs.filter(d => d.status !== "off").length, T("Đang quản lý")) +
+      stat(devs.filter(d => d.status === "broken").length, T("Đang hỏng"), "var(--r)") +
       stat(openInc.length, T("Sự cố chưa xong"), openInc.length ? "var(--o)" : "") +
-      stat(logs.length ? Math.round(ontime * 100 / logs.length) + "%" : "–", T("Đúng hạn tháng này ({n} lần)", {n: logs.length})) + '</div>';
+      stat(logs.length ? Math.round(ontime * 100 / logs.length) + "%" : "–", T("Đúng hạn({n} lần)", {n: logs.length})) + '</div>';
     const newInc = openInc.sort((a, b) => b.at - a.at).slice(0, 3);
     if (newInc.length) h += '<h3>' + esc(T("Sự cố cần xử lý")) + '</h3>' + newInc.map(incItem).join("");
     if (b.over.length) h += '<h3>' + esc(T("Việc trễ hạn")) + '</h3>' + b.over.slice(0, 5).map(planItem).join("");
