@@ -55,6 +55,8 @@ h3{font-size:17px;margin:18px 0 8px;color:var(--g2)}
 .kpi.r{background:var(--r)}.kpi.a{background:#E0A100;color:#2b2000}.kpi.g{background:var(--g)}
 .kpi.zero{opacity:.55}
 .brokebar{display:flex;align-items:center;gap:10px;width:100%;min-height:56px;border:0;border-radius:14px;background:var(--rl);color:var(--r);font-weight:800;font-size:17px;padding:10px 14px;margin-bottom:10px;cursor:pointer;text-align:left}
+.it.ap .t2{white-space:normal}
+.brokebar.pendbar{background:var(--al);color:var(--a)}
 .brokebar small{font-weight:600;color:#8a3b3b}
 .stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .stat{background:#fff;border:1px solid var(--bd);border-radius:14px;padding:12px}
@@ -142,6 +144,24 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .prow{display:flex;gap:8px;margin-bottom:8px;align-items:center}.prow .pn{flex:1;min-width:0}.prow .pq{width:84px;flex:none;text-align:center}
 .btn.px{width:52px;min-height:52px;padding:0;flex:none;color:var(--r)}
+/* Thiết bị dạng ô */
+.dgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (min-width:700px){.dgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:1000px){.dgrid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (min-width:900px){main.v-devices{max-width:1180px}}
+.dt{position:relative;background:#fff;border:1.5px solid var(--bd);border-radius:16px;overflow:hidden;cursor:pointer;display:flex;flex-direction:column;transition:transform .1s}
+.dt:active{transform:scale(.98)}
+.dt .pic{height:104px;display:flex;align-items:center;justify-content:center;background:var(--gl)}
+.dt.broken{border-color:#f0b9b9}.dt.broken .pic{background:var(--rl)}
+.dt.off{opacity:.7}.dt.off .pic{background:#eceeec}
+.dt .pic svg{width:78px;height:78px}
+.dt .dst{position:absolute;top:8px;right:8px}
+.dt .sel{position:absolute;top:8px;left:8px;background:#fff}
+.dt.picked{border-color:var(--g);box-shadow:0 0 0 2px var(--g)}
+.dtb{padding:10px 12px 12px}
+.dcd{font-size:17px}
+.dnm{font-weight:600;font-size:15px;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.dmeta{font-size:13px;color:var(--mu);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .hl{background:var(--yl);border-radius:12px;padding:10px 12px;font-size:15px;margin-bottom:12px}
 /* Labels */
 #print-area{display:none}
@@ -189,7 +209,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "21/10/2026 15:00";
+const VERSION = "21/10/2026 17:00";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyAfy4QMD9_7PyFHpInNdKDRWuW4AYCtLJ4",
@@ -298,7 +318,7 @@ const ICONS = {
 const ic = (n, cls) => '<svg class="i ' + (cls||"") + '" viewBox="0 0 24 24"><path d="' + ICONS[n] + '"/></svg>';
 
 /* ================== DANH MỤC ================== */
-const ROLES = {admin:"Quản trị", manager:"Quản đốc", worker:"Công nhân"};
+const ROLES = {admin:"Quản trị", manager:"Quản đốc", leader:"Tổ trưởng", worker:"Công nhân"};
 const DSTATUS = {ok:["Hoạt động","g","ok"], off:["Ngừng dùng","m","off"]};
 /* Tình trạng sự cố: chỉ 2 trạng thái. Dữ liệu cũ (open/doing/fixing/broken) đều = Đang hỏng */
 const ISTATUS = {open:["Đang hỏng","r"], done:["Đã sửa xong","g"]};
@@ -307,6 +327,7 @@ const waitDays = i => daysBetween(i.date || ymd(new Date(i.at)), today());
 const UNITS = {day:"ngày", week:"tuần", month:"tháng", year:"năm", once:"1 lần"};
 const DEF_CFG = {areas:["Xưởng Đan","Xưởng PVC","Xưởng Cao su","Xưởng May","Kho","Văn phòng"], kinds:["Vệ sinh","Tra dầu mỡ","Kiểm tra điện","Kiểm tra tổng quát","Thay thế linh kiện"],
   groups:["Máy đan","Máy in PVC","Máy nhúng cao su","Lò sấy / lò lưu hoá","Máy may","Máy nén khí","Nồi hơi","Xe nâng","Máy đóng gói","Khác"],
+  depts:["Bảo trì","Đan","PVC","Cao su","May","Kho"],
   parts:["Kim đan","Lưỡi gà","Lò xo kim","Dây curoa","Bạc đạn","Motor","Cảm biến","Rơ-le nhiệt","Phớt bơm","Kim may","Dao cắt","Lọc gió","Xích tải","Khuôn tay"]};
 const GAUGES = ["7G","8G","10G","13G","15G"];                       // loại máy đan
 const isKnit = g => String(g || "").trim().toLowerCase() === "máy đan";
@@ -346,7 +367,7 @@ function withTimeout(p, ms){ return Promise.race([p, new Promise((_, rej) => set
 const savedMsg = () => toast(navigator.onLine ? T("Đã lưu") : T("Đã lưu. Có mạng sẽ tự gửi lên."), "ok");
 
 /* ================== TRẠNG THÁI ================== */
-const S = {user: null, dev: {}, plans: {}, acc: {}, incOpen: {}, incMonth: [], logsMonth: [], cfg: Object.assign({}, DEF_CFG), loaded: {}};
+const S = {user: null, dev: {}, plans: {}, acc: {}, incOpen: {}, incPend: {}, incMonth: [], logsMonth: [], cfg: Object.assign({}, DEF_CFG), loaded: {}};
 let V = {view: "home", p: {}};
 let UNSUB = [];
 let PH = [];            // ảnh đang chọn trong form
@@ -362,11 +383,12 @@ function startLive(){
   sub(Q("plans", "active", true), sn => { S.plans = {}; docs("plans", sn).forEach(d => S.plans[d._id] = d); S.loaded.plans = 1; liveRender(); });
   sub(Q("incidents", "open", true), sn => { S.incOpen = {}; docs("incidents", sn).forEach(d => S.incOpen[d._id] = d); liveRender(); });
   sub(Q("incidents", "month", ym()), sn => { S.incMonth = docs("incidents", sn); liveRender(); });
+  sub(Q("incidents", "appr", false), sn => { S.incPend = {}; docs("incidents", sn).forEach(d => S.incPend[d._id] = d); liveRender(); });   // báo cáo chờ duyệt
   UNSUB.push(R("config", "main").onSnapshot(s => { S.cfg = Object.assign({}, DEF_CFG, s.exists ? s.data() : {}); liveRender(); }, onErr));
-  if (isMgr()){
+  if (isMgr() || S.user.role === "leader"){
     sub(Q("accounts"), sn => { S.acc = {}; docs("accounts", sn).forEach(d => S.acc[d._id] = d); liveRender(); });
-    sub(Q("logs", "month", ym()), sn => { S.logsMonth = docs("logs", sn); liveRender(); });
   }
+  if (isMgr()) sub(Q("logs", "month", ym()), sn => { S.logsMonth = docs("logs", sn); liveRender(); });
 }
 function stopLive(){ UNSUB.forEach(u => { try { u(); } catch(e){} }); UNSUB = []; }
 let lrT;
@@ -376,7 +398,13 @@ function liveRender(){ clearTimeout(lrT); lrT = setTimeout(() => { if (VIEWS[V.v
 function planList(){
   return Object.values(S.plans).filter(p => { const d = S.dev[p.devId]; return p.active !== false && (!d || devState(d)[2] === "ok"); });   // máy đang hỏng: tạm dừng lịch
 }
-function myPlans(){ const L = planList(); return S.user.role === "worker" ? L.filter(p => !p.assignee || p.assignee === S.user.id) : L; }
+const deptOf = id => { const a = S.acc[id]; return a ? (a.dept || a.area || "") : ""; };
+function myPlans(){
+  const L = planList(), u = S.user;
+  if (u.role === "worker") return L.filter(p => !p.assignee || p.assignee === u.id);
+  if (u.role === "leader"){ const me = deptOf(u.id); return L.filter(p => !p.assignee || p.assignee === u.id || (me && deptOf(p.assignee) === me)); }   // tổ trưởng: việc của cả bộ phận
+  return L;
+}
 function buckets(){
   const t = today(), sun = endOfWeek(), L = myPlans().sort((a, b) => a.nextDue < b.nextDue ? -1 : 1);
   return {over: L.filter(p => p.nextDue < t), today: L.filter(p => p.nextDue === t), week: L.filter(p => p.nextDue >= t && p.nextDue <= sun)};
@@ -428,7 +456,7 @@ function render(keepScroll){
       '<button class="hb" onclick="setLang(LANG===\'vi\'?\'ja\':\'vi\')">' + (LANG === "vi" ? "日本語" : "Tiếng Việt") + '</button>' +
       (isMgr() ? '<button class="hb" onclick="go(\'more\')" aria-label="menu">' + ic("user") + '</button>' : "") +
     '</header>' +
-    '<main id="main" class="' + (v.wide ? "wide" : "") + '">' + v.html() + '</main>' +
+    '<main id="main" class="' + (v.wide ? "wide " : "") + "v-" + V.view + '">' + v.html() + '</main>' +
     '<nav class="bn" id="nav"></nav>';
   renderChrome();
   if (v.after) v.after();
@@ -451,7 +479,7 @@ const lst = h => '<div class="lst">' + h + '</div>';   // danh sách: 2 cột tr
 const empty = (icon, msg) => '<div class="empty">' + ic(icon) + '<div>' + esc(msg) + '</div></div>';
 function planItem(p){
   const t = today(), cls = p.nextDue < t ? "r" : p.nextDue === t ? "a" : "";
-  return '<div class="it ' + cls + '" onclick="go(\'do\',{id:\'' + p._id + '\'})"><div class="f">' +
+  return '<div class="it ' + cls + '" onclick="' + (isWatcher() ? "go('device',{code:'" + p.devId + "'})" : "go('do',{id:'" + p._id + "'})") + '"><div class="f">' +
     '<div class="t1">' + esc(p.task) + '</div>' +
     '<div class="t2"><span class="code">' + esc(p.devId) + '</span> · ' + esc(devName(p.devId)) + '</div></div>' + dueChip(p) + '</div>';
 }
@@ -461,13 +489,23 @@ function devItem(d, sel){
   return '<div class="it ' + (s[1] === "g" ? "" : s[1]) + '" onclick="' + (sel ? "toggleSel('" + d._id + "')" : "go('device',{code:'" + d._id + "'})") + '">' + selBox +
     '<div class="f"><div class="t1"><span class="code">' + esc(d._id) + '</span></div><div class="t2">' + esc([d.name, groupLabel(d), d.area].filter(Boolean).join(" · ")) + '</div></div>' + dChip(d) + '</div>';
 }
+/* Quy trình sự cố:
+   - Người báo (công nhân / tổ trưởng / quản đốc) tự cập nhật từ Đang hỏng đến Đã sửa xong, sửa được báo cáo của mình cho đến khi được duyệt.
+   - Quản đốc duyệt cuối cùng, sau khi đã sửa xong. Báo cáo của chính quản đốc tự duyệt khi sửa xong.
+   - Quản trị chỉ theo dõi: không báo, không cập nhật, không duyệt. */
+const isWatcher = () => S.user && S.user.role === "admin";
+const isLocked = i => i.appr === true || (i.appr === undefined && iSt(i) === "done");   // dữ liệu cũ đã xong = coi như đã duyệt
+const isPend = i => iSt(i) === "done" && i.appr === false;                              // đã sửa xong, chờ quản đốc duyệt
+const canEditInc = i => !isWatcher() && !isLocked(i) && i.by === S.user.id;
+const canApprove = i => isPend(i) && S.user.role === "manager" && i.by !== S.user.id;
+const autoAppr = () => S.user.role === "manager";
 function incItem(i){
   const k = iSt(i), s = ISTATUS[k];
   return '<div class="it ' + (k === "done" ? "" : "r") + '" onclick="go(\'incident\',{id:\'' + i._id + '\'})"><div class="f">' +
     '<div class="t1">' + esc(i.desc || T("Sự cố")) + '</div>' +
     '<div class="t2"><span class="code">' + esc(i.devId) + '</span> · ' + esc(i.devName || devName(i.devId)) + ' · ' + esc(fmtDT(i.at)) + '</div>' +
     (k === "open" && i.next ? '<div class="t2" style="color:var(--a)">➜ ' + esc(i.next) + '</div>' : "") + '</div>' +
-    '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">' + chip(s[0], s[1]) +
+    '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">' + chip(s[0], s[1]) + (isPend(i) ? chip("Chờ duyệt", "a") : "") +
     '<span class="sm mu">' + esc(k === "open" ? T("{n} ngày", {n: waitDays(i)}) : fmtDur(i.fixAt - i.at)) + '</span></div></div>';
 }
 /* Thời lượng dễ đọc: phút / giờ / ngày */
@@ -497,11 +535,33 @@ VIEWS.home = {wide: true, live: true, html(){
     h += '<button class="brokebar" onclick="go(\'incidents\')">' + ic("alert") + '<span class="f">' + esc(T("{n} máy đang hỏng", {n: nDev})) +
       (maxD > 0 ? ' <small>· ' + esc(T("lâu nhất {d} ngày", {d: maxD})) + '</small>' : "") + '</span>' + ic("chev") + '</button>';
   }
-  h += '<button class="btn w" onclick="go(\'incnew\')">' + ic("alert") + T("Báo sự cố") + '</button>';
+  // báo cáo của mình đang mở hoặc chờ duyệt (công nhân, tổ trưởng)
+  if (u.role === "worker" || u.role === "leader"){
+    const mine = Object.values(S.incPend).filter(i => i.by === u.id && !isLocked(i)), mo = mine.filter(i => iSt(i) === "open").length, mp = mine.length - mo;
+    if (mine.length) h += '<button class="brokebar pendbar" onclick="go(\'incidents\',{tab:\'' + (mo ? "open" : "pend") + '\'})">' + ic("clock") + '<span class="f">' +
+      esc([mo ? T("{n} báo cáo của bạn chưa sửa xong", {n: mo}) : "", mp ? T("{n} đang chờ duyệt", {n: mp}) : ""].filter(Boolean).join(" · ")) + '</span>' + ic("chev") + '</button>';
+  }
+  if (!isWatcher()) h += '<button class="btn w" onclick="go(\'incnew\')">' + ic("alert") + T("Báo sự cố") + '</button>';
   const L = b.over.concat(b.today);
-  h += '</div><div><h3 class="h3top">' + esc(T("Việc cần làm")) + '</h3>' + (L.length ? L.slice(0, 8).map(planItem).join("") : empty("ok", T("Hôm nay không có việc cần làm."))) + '</div></div>';
+  h += '</div><div><h3 class="h3top">' + esc(T("Việc cần làm")) + '</h3>' + (L.length ? L.slice(0, 8).map(planItem).join("") : empty("ok", T("Hôm nay không có việc cần làm.")));
+  // Quản đốc: duyệt ngay dưới Việc cần làm
+  if (u.role === "manager"){
+    const P = Object.values(S.incPend).filter(canApprove).sort((a, b) => a.fixAt - b.fixAt);
+    h += '<h3>' + esc(T("Chờ duyệt")) + (P.length ? ' <span class="chip a">' + P.length + '</span>' : "") + '</h3>' +
+      (P.length ? P.map(apprItem).join("") : empty("ok", T("Không có báo cáo nào chờ duyệt.")));
+  }
+  h += '</div></div>';
   return h;
 }};
+/* Một dòng chờ duyệt: bấm để xem chi tiết, nút Duyệt ở bên phải */
+function apprItem(i){
+  return '<div class="it a ap" onclick="go(\'incident\',{id:\'' + i._id + '\'})"><div class="f">' +
+    '<div class="t1">' + esc(i.desc || T("Sự cố")) + '</div>' +
+    '<div class="t2"><span class="code">' + esc(i.devId) + '</span> · ' + esc(i.devName || devName(i.devId)) + '</div>' +
+    '<div class="t2">' + esc(T("Đã sửa: {f}", {f: i.fix || ""})) + (i.parts && i.parts.length ? ' · ' + esc(i.parts.map(r => r.n + " × " + r.q).join(", ")) : "") + '</div>' +
+    '<div class="t2">' + esc((i.byName || "") + " · " + fmtDT(i.fixAt)) + '</div></div>' +
+    '<button class="btn sm" onclick="event.stopPropagation();approveInc(\'' + i._id + '\')">' + ic("ok") + T("Duyệt") + '</button></div>';
+}
 const stat = (n, t, c, on) => '<div class="stat"' + (on ? ' style="cursor:pointer" onclick="' + on + '"' : "") + '><b' + (c ? ' style="color:' + c + '"' : "") + '>' + n + '</b><span>' + esc(t) + '</span></div>';
 
 /* ---- Danh sách việc ---- */
@@ -532,7 +592,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
       (d.since ? '<dt>' + esc(T("Ngày sử dụng")) + '</dt><dd>' + esc(fmtD(d.since)) + '</dd>' : "") +
       (d.note ? '<dt>' + esc(T("Ghi chú")) + '</dt><dd>' + esc(d.note) + '</dd>' : "") +
     '</dl></div>';
-  h += '<div class="btns" style="margin-bottom:6px"><button class="btn r" onclick="go(\'incnew\',{code:\'' + c + '\'})">' + ic("alert") + T("Báo sự cố") + '</button>' +
+  h += '<div class="btns" style="margin-bottom:6px">' + (isWatcher() ? "" : '<button class="btn r" onclick="go(\'incnew\',{code:\'' + c + '\'})">' + ic("alert") + T("Báo sự cố") + '</button>') +
     (isMgr() ? '<button class="btn w" onclick="go(\'devform\',{code:\'' + c + '\'})">' + ic("edit") + T("Sửa") + '</button>' : "") + '</div>';
   if (incs.length) h += '<h3>' + esc(T("Sự cố chưa xong")) + '</h3>' + incs.map(incItem).join("");
   h += '<h3>' + esc(T("Kế hoạch bảo trì")) + '</h3>' + (plans.length ? plans.map(p => planItem(p)).join("") : empty("cal", T("Chưa có kế hoạch")));
@@ -571,6 +631,7 @@ function drawHist(){
 
 /* ---- Thực hiện bảo trì ---- */
 VIEWS.do = {title: () => T("Ghi kết quả bảo trì"), html(){
+  if (isWatcher()) return empty("cal", T("Quản trị chỉ theo dõi, không ghi kết quả bảo trì."));
   const p = S.plans[V.p.id];
   if (!p) return empty("cal", T("Kế hoạch không còn hoặc đã hoàn thành"));
   if (F.planId !== p._id){ F = {planId: p._id, ck: {}, res: "", note: "", parts: []}; PH = []; }
@@ -701,8 +762,14 @@ function loadPhotos(ids, el){
 }
 
 /* ---- Báo sự cố ---- */
-VIEWS.incnew = {title: () => T("Báo sự cố"), html(){
-  if (F.form !== "inc"){ F = {form: "inc", st: "open", fix: "", desc: F.pre || "", code: V.p.code || "", parts: []}; PH = []; }
+VIEWS.incnew = {title: () => V.p.edit ? T("Sửa báo cáo sự cố") : T("Báo sự cố"), html(){
+  if (isWatcher()) return empty("alert", T("Quản trị chỉ theo dõi, không báo sự cố."));
+  if (V.p.edit){   // sửa lại báo cáo của chính mình
+    const i = curInc0(V.p.edit);
+    if (!i) return empty("alert", "…");
+    if (!canEditInc(i)) return empty("alert", T("Báo cáo đã được duyệt hoặc không phải của bạn, không sửa được."));
+    if (F.edit !== i._id){ F = {form: "inc", edit: i._id, st: iSt(i), fix: i.fix || "", desc: i.desc || "", code: i.devId, parts: (i.parts || []).map(r => ({n: r.n, q: r.q})), oldPh: (i.photos || []).slice()}; PH = []; }
+  } else if (F.form !== "inc" || F.edit){ F = {form: "inc", st: "open", fix: "", desc: F.pre || "", code: V.p.code || "", parts: []}; PH = []; }
   else if (V.p.code && !F.code) F.code = V.p.code;
   const d = S.dev[F.code];
   let h = '<div class="lc"><label class="req">' + esc(T("Thiết bị")) + '</label>';
@@ -713,10 +780,17 @@ VIEWS.incnew = {title: () => T("Báo sự cố"), html(){
     ["open", "done"].map(k => '<button class="opt ' + (k === "open" ? "r" : "") + ' ' + (F.st === k ? "on" : "") + '" onclick="F.st=\'' + k + '\';render(true)">' + esc(T(ISTATUS[k][0])) + '</button>').join("") + '</div>' +
     (F.st === "open" ? '<div class="mu sm" style="margin-top:4px">' + esc(T("Nếu đã tự sửa xong tại chỗ thì chọn \"Đã sửa xong\".")) + '</div>' : "") + '</div>';
   if (F.st === "done") h += '<div class="lc"><label class="req">' + esc(T("Đã sửa như thế nào")) + '</label><textarea oninput="F.fix=this.value">' + esc(F.fix) + '</textarea></div>' + partsSection();
-  h += '<div class="lc"><label>' + esc(T("Ảnh hiện trường")) + ' <span class="mu sm">(' + esc(T("tối đa 3 ảnh")) + ')</span></label>' + photoBox(3) + '</div>';
-  h += '<button class="btn r" onclick="saveInc()">' + ic("alert") + T("GỬI BÁO CÁO SỰ CỐ") + '</button>';
+  const old = F.oldPh || [];
+  h += '<div class="lc"><label>' + esc(T("Ảnh hiện trường")) + ' <span class="mu sm">(' + esc(T("tối đa 3 ảnh")) + ')</span></label>' +
+    (old.length ? '<div class="phs" style="margin-bottom:8px">' + old.map(id => '<div class="ph" id="op_' + id + '"><div class="phload">…</div><button class="x" onclick="F.oldPh.splice(F.oldPh.indexOf(\'' + id + '\'),1);render(true)">' + ic("x") + '</button></div>').join("") + '</div>' : "") +
+    photoBox(Math.max(0, 3 - old.length)) + '</div>';
+  h += F.edit ? '<button class="btn" onclick="saveInc()">' + ic("ok") + T("LƯU THAY ĐỔI") + '</button>'
+              : '<button class="btn r" onclick="saveInc()">' + ic("alert") + T("GỬI BÁO CÁO SỰ CỐ") + '</button>';
   return h;
+}, after(){
+  (F.oldPh || []).forEach(id => R("photos", id).get().then(s => { const b = document.getElementById("op_" + id); if (b && s.exists){ const l = b.querySelector(".phload"); if (l) l.outerHTML = '<img src="' + s.data().data + '" onclick="zoom(this.src)">'; } }).catch(() => {}));
 }};
+const curInc0 = id => (F.incCache && F.incCache._id === id && Date.now() - (F.incCache._fresh || 0) < 5000 ? F.incCache : null) || S.incPend[id] || S.incOpen[id] || S.incMonth.find(x => x._id === id) || (F.incCache && F.incCache._id === id ? F.incCache : null);
 function devSelect(id, val, onch){
   const L = Object.values(S.dev).filter(d => d.status !== "off").sort((a, b) => a._id < b._id ? -1 : 1);
   return '<select id="' + id + '" onchange="' + (onch || "F.code=this.value;render()") + '"><option value="">' + esc(T("— Chọn thiết bị —")) + '</option>' +
@@ -725,31 +799,47 @@ function devSelect(id, val, onch){
 function saveInc(){
   const d = S.dev[F.code];
   if (!d){ toast(T("Chọn thiết bị"), "err"); return; }
-  if (!(F.desc || "").trim() && !PH.length){ toast(T("Nhập mô tả hoặc chụp ảnh"), "err"); return; }
+  if (!(F.desc || "").trim() && !PH.length && !(F.oldPh || []).length){ toast(T("Nhập mô tả hoặc chụp ảnh"), "err"); return; }
   const fix = F.st === "done" ? (F.fix || "").trim() : "";
   if (F.st === "done" && !fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
   const prow = F.st === "done" ? partsRows() : []; if (!prow) return;
-  const t = today(), now = Date.now(), pids = savePhotos(F.code), incId = uid();
+  const now = Date.now(), pids = savePhotos(F.code);
+  if (F.edit){   // lưu bản sửa của người báo
+    const i = curInc0(F.edit);
+    if (!i || !canEditInc(i)){ toast(T("Báo cáo đã được duyệt, không sửa được nữa."), "err"); return; }
+    const u = {devId: F.code, devName: d.name, area: d.area || "", desc: (F.desc || "").trim(), photos: (F.oldPh || []).concat(pids),
+      status: F.st, open: F.st !== "done", fix, parts: prow, edits: (i.edits || []).concat([{at: now, by: S.user.name}])};
+    if (F.st === "done"){ u.fixAt = iSt(i) === "done" && i.fixAt ? i.fixAt : now; u.fixBy = S.user.name; } else { u.fixAt = null; u.fixBy = ""; }
+    if (F.st === "done" && autoAppr()){ Object.assign(u, apprFields(i), {partsSaved: true}); saveParts(prow, F.code, "inc", i._id); }
+    put("incidents", i._id, u, true);
+    F.incCache = Object.assign({}, i, u, {_fresh: Date.now()}); S.incPend[i._id] = F.incCache;
+    if (u.open) S.incOpen[i._id] = F.incCache; else delete S.incOpen[i._id];
+    const id = i._id; F = {incCache: F.incCache}; PH = [];
+    savedMsg(); go("incident", {id}, true); return;
+  }
+  const t = today(), incId = uid(), auto = autoAppr() && F.st === "done";   // quản đốc tự báo và đã sửa xong: tự duyệt
   const doc = {devId: F.code, devName: d.name, area: d.area || "", desc: (F.desc || "").trim(), photos: pids,
-    status: F.st, open: F.st !== "done", fix, next: "", by: S.user.id, byName: S.user.name, at: now, date: t, month: ym(t)};
-  if (F.st === "done"){ doc.fixAt = now; doc.fixBy = S.user.name; doc.parts = prow; saveParts(prow, F.code, "inc", incId); }
+    status: F.st, open: F.st !== "done", fix, next: "", by: S.user.id, byName: S.user.name, byRole: S.user.role, at: now, date: t, month: ym(t),
+    appr: auto, apprBy: auto ? S.user.name : "", apprById: auto ? S.user.id : "", apprAt: auto ? now : null};
+  if (F.st === "done"){ doc.fixAt = now; doc.fixBy = S.user.name; doc.parts = prow; if (auto){ saveParts(prow, F.code, "inc", incId); doc.partsSaved = true; } }
   put("incidents", incId, doc);
   const c = F.code; F = {}; PH = [];
-  savedMsg(); vib();
+  toast(auto || F.st === "open" ? T("Đã lưu") : T("Đã gửi, chờ quản đốc duyệt"), "ok"); vib();
   go("device", {code: c}, true);
 }
 
 /* ---- Danh sách sự cố ---- */
 VIEWS.incidents = {wide: true, live: true, title: () => T("Sự cố"), html(){
-  const tab = V.p.tab === "done" ? "done" : "open";
+  const tab = ["done", "pend"].indexOf(V.p.tab) >= 0 ? V.p.tab : "open";
+  const pend = Object.values(S.incPend).filter(i => isPend(i) && (isMgr() || i.by === S.user.id)).sort((a, b) => a.fixAt - b.fixAt);
   const open = Object.values(S.incOpen).sort((a, b) => a.at - b.at);   // hỏng lâu nhất lên đầu
   const done = S.incMonth.filter(i => iSt(i) === "done").sort((a, b) => (b.fixAt || b.at) - (a.fixAt || a.at));
   const tb = (k, t, n, red) => '<button class="' + (tab === k ? "on" : "") + '" onclick="go(\'incidents\',{tab:\'' + k + '\'},true)">' + esc(T(t)) + (n ? '<span class="n"' + (red ? "" : ' style="background:#777"') + '>' + n + '</span>' : "") + '</button>';
-  let h = '<button class="btn r" style="margin-bottom:12px" onclick="go(\'incnew\')">' + ic("plus") + T("Báo sự cố mới") + '</button>';
-  h += '<div class="tabs">' + tb("open", "Đang hỏng", open.length, 1) + tb("done", "Sửa xong tháng này", done.length) + '</div>';
+  let h = isWatcher() ? "" : '<button class="btn r" style="margin-bottom:12px" onclick="go(\'incnew\')">' + ic("plus") + T("Báo sự cố mới") + '</button>';
+  h += '<div class="tabs">' + tb("pend", "Chờ duyệt", pend.length, 1) + tb("open", "Đang hỏng", open.length, 1) + tb("done", "Sửa xong tháng này", done.length) + '</div>';
   if (tab === "open" && open.length) h += '<div class="mu sm" style="margin:-4px 2px 8px">' + esc(T("Lịch bảo trì của máy đang hỏng sẽ tạm ngưng đến khi sửa xong.")) + '</div>';
-  const L = tab === "done" ? done : open;
-  h += L.length ? lst(L.map(incItem).join("")) : empty("ok", tab === "done" ? T("Tháng này chưa có máy nào sửa xong.") : T("Hiện không có máy nào hỏng."));
+  const L = tab === "done" ? done : tab === "pend" ? pend : open;
+  h += L.length ? lst(L.map(incItem).join("")) : empty("ok", tab === "done" ? T("Tháng này chưa có máy nào sửa xong.") : tab === "pend" ? T("Không có báo cáo nào chờ duyệt.") : T("Hiện không có máy nào hỏng."));
   return h;
 }};
 
@@ -760,16 +850,27 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
     return '<div class="empty"><div class="spin" style="margin:auto"></div></div>';
   }
   const k = iSt(i), s = ISTATUS[k], hist = nextLog(i);
-  let h = '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">' + chip(s[0], s[1]) + (k === "open" ? chip(T("{n} ngày", {n: waitDays(i)}), "m") : "") + '</div>' +
+  let h = '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">' + chip(s[0], s[1]) + (k === "open" ? chip(T("{n} ngày", {n: waitDays(i)}), "m") : "") +
+    (isPend(i) ? chip("Chờ duyệt", "a") : (i.apprBy ? chip(T("Đã duyệt"), "g") : "")) + '</div>' +
     '<div class="b" style="font-size:18px;margin-bottom:8px">' + esc(i.desc || "") + '</div><dl class="info">' +
     '<dt>' + esc(T("Thiết bị")) + '</dt><dd><a href="#" onclick="go(\'device\',{code:\'' + esc(i.devId) + '\'});return false" class="code" style="color:var(--g)">' + esc(i.devId) + '</a> · ' + esc(i.devName || "") + '</dd>' +
     '<dt>' + esc(T("Người báo")) + '</dt><dd>' + esc(i.byName) + '</dd><dt>' + esc(T("Thời gian")) + '</dt><dd>' + esc(fmtDT(i.at)) + '</dd>' +
     (i.fix ? '<dt>' + esc(T("Đã sửa như thế nào")) + '</dt><dd>' + esc(i.fix) + '</dd>' : "") +
+    (i.apprBy ? '<dt>' + esc(T("Duyệt")) + '</dt><dd>' + esc(fmtDT(i.apprAt)) + ' · ' + esc(i.apprBy) + '</dd>' : "") +
+    (i.edits && i.edits.length ? '<dt>' + esc(T("Người báo đã sửa")) + '</dt><dd>' + esc(T("{n} lần, gần nhất {t}", {n: i.edits.length, t: fmtDT(i.edits[i.edits.length - 1].at)})) + '</dd>' : "") +
     (i.parts && i.parts.length ? '<dt>' + esc(T("Linh kiện đã thay")) + '</dt><dd>' + esc(i.parts.map(r => r.n + " × " + r.q).join(", ")) + '</dd>' : "") +
     (i.fixAt ? '<dt>' + esc(T("Xong lúc")) + '</dt><dd>' + esc(fmtDT(i.fixAt)) + ' · ' + esc(i.fixBy || "") + '</dd><dt>' + esc(T("Thời gian sửa")) + '</dt><dd>' + esc(fmtDur(i.fixAt - i.at)) + '</dd>' : "") +
     '</dl>' + (i.photos && i.photos.length ? '<div class="phs" id="incph" style="margin-top:12px"></div>' : "") + '</div>';
-  // Cập nhật: chọn trạng thái, nhập nội dung, một nút Lưu
-  if (isMgr() && k === "open"){
+  // Người báo: sửa lại nội dung báo cáo (trước khi duyệt)
+  if (canEditInc(i)){
+    if (k === "done") h += '<div class="hl" style="margin-top:12px">' + esc(T("Báo cáo đang chờ quản đốc duyệt. Bạn vẫn sửa lại được cho đến khi được duyệt.")) + '</div>';
+    h += '<button class="btn w" style="margin-top:12px" onclick="go(\'incnew\',{edit:\'' + i._id + '\'})">' + ic("edit") + T("Sửa nội dung báo cáo") + '</button>';
+  }
+  // Quản đốc: duyệt cuối cùng
+  if (canApprove(i)) h += '<button class="btn y" style="margin-top:12px" onclick="approveInc()">' + ic("ok") + T("DUYỆT BÁO CÁO") + '</button>';
+  else if (k === "open" && !canEditInc(i)) h += '<div class="mu sm" style="margin-top:12px">' + esc(T("Người báo cập nhật tình trạng; quản đốc duyệt sau khi sửa xong.")) + '</div>';
+  // Người báo cập nhật tình trạng: chọn trạng thái, nhập nội dung, một nút Lưu
+  if (canEditInc(i) && k === "open"){
     if (F.incEdit !== i._id){ F.incEdit = i._id; F.ist = "open"; F.next = ""; F.fix = ""; F.parts = []; }
     h += '<h3>' + esc(T("Cập nhật tình trạng")) + '</h3><div class="opts" style="margin-bottom:12px">' +
       '<button class="opt r ' + (F.ist === "open" ? "on" : "") + '" onclick="F.ist=\'open\';render(true)">' + esc(T("Đang hỏng")) + '</button>' +
@@ -788,9 +889,17 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
   const i = curInc();
   if (i) loadPhotos(i.photos, $("#incph"));
 }};
-const curInc = () => S.incOpen[V.p.id] || S.incMonth.find(x => x._id === V.p.id) || F.incCache;
+const curInc = () => (F.incCache && F.incCache._id === V.p.id && Date.now() - (F.incCache._fresh || 0) < 5000) ? F.incCache : (S.incPend[V.p.id] || S.incOpen[V.p.id] || S.incMonth.find(x => x._id === V.p.id) || F.incCache);
 /* Danh sách các lần ghi hướng xử lý; dữ liệu cũ chỉ có 1 trường next thì đổi thành 1 dòng */
 const nextLog = i => Array.isArray(i.nextLog) ? i.nextLog : (i.next ? [{t: i.next, by: i.nextBy || "", at: i.nextAt || i.at}] : []);
+const apprFields = i => ({appr: true, apprBy: S.user.name, apprById: S.user.id, apprAt: Date.now()});
+function approveInc(id){
+  const i = id ? curInc0(id) : curInc(); if (!i || !canApprove(i)) return;
+  const u = apprFields(i);
+  if (iSt(i) === "done" && i.parts && i.parts.length && !i.partsSaved){ saveParts(i.parts, i.devId, "inc", i._id); u.partsSaved = true; }   // linh kiện tự sửa: tính vào thống kê khi duyệt
+  put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u, {_fresh: Date.now()}); delete S.incPend[i._id];
+  toast(T("Đã duyệt báo cáo"), "ok"); vib(); render(true);
+}
 function saveIncUpd(){
   const i = curInc(); if (!i) return;
   const now = Date.now();
@@ -801,15 +910,17 @@ function saveIncUpd(){
     const u = {next: t, nextBy: S.user.name, nextAt: now, nextLog: log};
     put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u); F.next = "";
     if (S.incOpen[i._id]) S.incOpen[i._id] = F.incCache;   // hiện ngay dòng vừa thêm, không chờ Firestore
+    if (S.incPend[i._id]) S.incPend[i._id] = F.incCache;
     savedMsg(); render(true);
   } else {
     const fix = (F.fix || "").trim();
     if (!fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
     const prow = partsRows(); if (!prow) return;
-    saveParts(prow, i.devId, "inc", i._id);
-    const u = {status: "done", open: false, fix, fixAt: now, fixBy: S.user.name, parts: prow};
-    put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u);
-    savedMsg(); back();
+    const u = {status: "done", open: false, fix, fixAt: now, fixBy: S.user.name, parts: prow, partsSaved: false, appr: false};
+    if (autoAppr()){ Object.assign(u, apprFields(i), {partsSaved: true}); saveParts(prow, i.devId, "inc", i._id); }   // quản đốc tự sửa: tự duyệt
+    put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u, {_fresh: Date.now()});
+    delete S.incOpen[i._id]; if (u.appr) delete S.incPend[i._id]; else S.incPend[i._id] = F.incCache;
+    toast(u.appr ? T("Đã lưu") : T("Đã gửi, chờ quản đốc duyệt"), "ok"); render(true);
   }
 }
 
@@ -836,7 +947,32 @@ function filteredDevs(){
 function drawDevs(){
   const L = filteredDevs(), el = $("#dlist"); if (!el) return;
   $("#dcount").textContent = T("{n} thiết bị", {n: L.length});
-  el.innerHTML = L.length ? lst(L.slice(0, 300).map(d => devItem(d, F.selMode)).join("")) : empty("box", S.loaded.dev ? T("Chưa có thiết bị") : "…");
+  el.innerHTML = L.length ? '<div class="dgrid">' + L.slice(0, 300).map(d => devTile(d, F.selMode)).join("") + '</div>' : empty("box", S.loaded.dev ? T("Chưa có thiết bị") : "…");
+}
+/* Hình máy vẽ bằng SVG, màu theo trạng thái; máy đan có thêm các cuộn sợi phía trên */
+function machineSvg(col, knit){
+  const dk = "#1f2622";
+  return '<svg viewBox="0 0 64 64" aria-hidden="true">' +
+    (knit ? '<path d="M14 15l4-10 4 10zM26 15l4-10 4 10zM38 15l4-10 4 10z" fill="' + col + '" opacity=".55"/><rect x="10" y="14" width="44" height="3" rx="1.5" fill="' + dk + '" opacity=".35"/>' : "") +
+    '<rect x="8" y="17" width="48" height="31" rx="4" fill="' + col + '"/>' +
+    '<rect x="13" y="22" width="19" height="12" rx="2" fill="#fff" opacity=".92"/>' +
+    '<rect x="16" y="25" width="9" height="2" rx="1" fill="' + col + '" opacity=".6"/><rect x="16" y="29" width="13" height="2" rx="1" fill="' + col + '" opacity=".4"/>' +
+    '<circle cx="43" cy="27" r="5" fill="#fff" opacity=".92"/><circle cx="43" cy="27" r="2" fill="' + col + '"/>' +
+    '<rect x="36" y="37" width="6" height="5" rx="1.2" fill="#fff" opacity=".85"/><rect x="45" y="37" width="6" height="5" rx="1.2" fill="#fff" opacity=".55"/>' +
+    '<rect x="13" y="38" width="19" height="5" rx="1" fill="#fff" opacity=".35"/>' +
+    '<rect x="12" y="48" width="6" height="7" rx="1" fill="' + dk + '" opacity=".7"/><rect x="46" y="48" width="6" height="7" rx="1" fill="' + dk + '" opacity=".7"/>' +
+    '<rect x="4" y="55" width="56" height="3" rx="1.5" fill="' + dk + '" opacity=".25"/></svg>';
+}
+function devTile(d, sel){
+  const s = devState(d), k = s[2];
+  const col = k === "broken" ? "#C62828" : k === "off" ? "#9aa39d" : "#2F6D42";
+  const on = sel && F.sel && F.sel[d._id];
+  return '<div class="dt ' + k + (on ? " picked" : "") + '" onclick="' + (sel ? "toggleSel('" + d._id + "')" : "go('device',{code:'" + d._id + "'})") + '">' +
+    (sel ? '<span class="sel ' + (on ? "on" : "") + '">' + ic("ok") + '</span>' : "") +
+    '<span class="dst">' + chip(s[0], s[1]) + '</span>' +
+    '<div class="pic">' + machineSvg(col, isKnit(d.group)) + '</div>' +
+    '<div class="dtb"><div class="code dcd">' + esc(d._id) + '</div><div class="dnm">' + esc(d.name || "") + '</div>' +
+    '<div class="dmeta">' + esc([groupLabel(d), d.area].filter(Boolean).join(" · ")) + '</div></div></div>';
 }
 function toggleSel(id){ F.sel[id] = !F.sel[id]; drawDevs(); $("#selN").textContent = Object.keys(F.sel).filter(k => F.sel[k]).length; }
 function selAll(){ const L = filteredDevs(), all = L.every(d => F.sel[d._id]); L.forEach(d => F.sel[d._id] = !all); drawDevs(); $("#selN").textContent = Object.keys(F.sel).filter(k => F.sel[k]).length; }
@@ -970,7 +1106,7 @@ VIEWS.planform = {mgr: true, title: () => V.p.id ? T("Sửa kế hoạch") : T("
   const e = V.p.id ? S.plans[V.p.id] : null;
   if (V.p.id && !e) return empty("cal", "…");
   const p = e || {devId: V.p.dev || "", unit: "month", every: 1, nextDue: today(), steps: []};
-  const workers = Object.values(S.acc).filter(a => a.role === "worker" && a.active !== false).sort((a, b) => a.name < b.name ? -1 : 1);
+  const workers = Object.values(S.acc).filter(a => (a.role === "worker" || a.role === "leader") && a.active !== false).sort((a, b) => a.name < b.name ? -1 : 1);
   let h = '<div class="lc"><label class="req">' + esc(T("Thiết bị")) + '</label>' + devSelect("pdev", p.devId, " ") + '</div>';
   h += '<div class="lc"><label class="req">' + esc(T("Hạng mục bảo trì")) + '</label><input id="ptask" list="dl_kinds" value="' + esc(p.task || "") + '" placeholder="' + esc(T("Ví dụ: Tra dầu mỡ")) + '"><datalist id="dl_kinds">' + (S.cfg.kinds || []).map(k => '<option value="' + esc(k) + '">').join("") + '</datalist></div>';
   h += '<div class="lc"><label>' + esc(T("Các bước kiểm tra (mỗi dòng 1 bước)")) + '</label><textarea id="psteps" rows="5" placeholder="' + esc(T("Vệ sinh bụi bẩn\nKiểm tra dây curoa\nTra dầu ổ trục")) + '">' + esc((p.steps || []).join("\n")) + '</textarea></div>';
@@ -1096,26 +1232,29 @@ const userCard = () => '<div class="card row"><div class="f"><div class="b" styl
 const foot = () => '<div class="foot">' + esc(T("Phiên bản")) + ' ' + VERSION + '</div>';
 
 /* ---- Tài khoản ---- */
+const canManageAcc = a => isAdmin() || (a && (a.role === "worker" || a.role === "leader"));
 VIEWS.accounts = {wide: true, live: true, mgr: true, title: () => T("Tài khoản"), html(){
-  const L = Object.values(S.acc).filter(a => isAdmin() || a.role === "worker").sort((a, b) => (a.role + a.name) < (b.role + b.name) ? -1 : 1);
+  const L = Object.values(S.acc).filter(canManageAcc).sort((a, b) => (a.role + a.name) < (b.role + b.name) ? -1 : 1);
   return '<button class="btn" style="margin-bottom:12px" onclick="go(\'accform\')">' + ic("plus") + T("Thêm tài khoản") + '</button>' +
-    (isAdmin() ? "" : '<div class="hl">' + esc(T("Quản đốc chỉ tạo và sửa tài khoản công nhân.")) + '</div>') +
-    lst(L.map(a => '<div class="it ' + (a.active === false ? "m" : "") + '" onclick="go(\'accform\',{id:\'' + esc(a._id) + '\'})"><div class="f"><div class="t1">' + esc(a.name) + '</div><div class="t2"><span class="code">' + esc(a._id) + '</span>' + (a.area ? " · " + esc(a.area) : "") + '</div></div>' +
-      (a.active === false ? chip("Đã khoá", "m") : chip(ROLES[a.role], a.role === "worker" ? "g" : "a")) + '</div>').join(""));
+    (isAdmin() ? "" : '<div class="hl">' + esc(T("Quản đốc tạo và sửa được tài khoản Tổ trưởng, Công nhân.")) + '</div>') +
+    lst(L.map(a => '<div class="it ' + (a.active === false ? "m" : "") + '" onclick="go(\'accform\',{id:\'' + esc(a._id) + '\'})"><div class="f"><div class="t1">' + esc(a.name) + '</div><div class="t2"><span class="code">' + esc(a._id) + '</span>' + ((a.dept || a.area) ? " · " + esc(a.dept || a.area) : "") + '</div></div>' +
+      (a.active === false ? chip("Đã khoá", "m") : chip(ROLES[a.role] || a.role, a.role === "worker" ? "g" : a.role === "leader" ? "o" : "a")) + '</div>').join(""));
 }};
 VIEWS.accform = {mgr: true, title: () => V.p.id ? T("Sửa tài khoản") : T("Thêm tài khoản"), html(){
   const e = V.p.id ? S.acc[V.p.id] : null;
   if (V.p.id && !e) return empty("user", "…");
   const a = e || {role: "worker", active: true};
-  if (e && !isAdmin() && e.role !== "worker") return empty("user", T("Không có quyền"));
-  const roles = isAdmin() ? ["worker", "manager", "admin"] : ["worker"];
+  if (e && !canManageAcc(e)) return empty("user", T("Không có quyền"));
+  const roles = isAdmin() ? ["worker", "leader", "manager", "admin"] : ["worker", "leader"];
   F = {form: "acc", role: a.role, active: a.active !== false};
   let h = '';
   h += e ? '<div class="hl">' + esc(T("Mã NV")) + ': <b class="code">' + esc(V.p.id) + '</b></div>'
     : '<div class="lc"><label class="req">' + esc(T("Mã nhân viên (dùng để đăng nhập)")) + '</label><input id="aid" autocapitalize="characters" placeholder="NV001"></div>';
   h += '<div class="lc"><label class="req">' + esc(T("Họ tên")) + '</label><input id="aname" value="' + esc(a.name || "") + '"></div>';
   h += '<div class="lc"><label>' + esc(T("Vai trò")) + '</label><div class="opts">' + roles.map(r => '<button class="opt ' + (F.role === r ? "on" : "") + '" onclick="F.role=\'' + r + '\';this.parentNode.querySelectorAll(\'.opt\').forEach(b=>b.classList.remove(\'on\'));this.classList.add(\'on\')">' + esc(T(ROLES[r])) + '</button>').join("") + '</div></div>';
-  h += '<div class="lc"><label>' + esc(T("Khu vực / Tổ")) + '</label><input id="aarea" list="dl_area2" value="' + esc(a.area || "") + '"><datalist id="dl_area2">' + areasAll().map(x => '<option value="' + esc(x) + '">').join("") + '</datalist></div>';
+  const depts = (S.cfg.depts || []).slice(), cur = a.dept || a.area || ""; if (cur && depts.indexOf(cur) < 0) depts.push(cur);
+  h += '<div class="lc"><label class="req">' + esc(T("Bộ phận")) + '</label><select id="adept"><option value="">' + esc(T("— Chọn bộ phận —")) + '</option>' +
+    depts.map(x => '<option' + (x === cur ? " selected" : "") + '>' + esc(x) + '</option>').join("") + '</select></div>';
   h += '<div class="lc"><label class="' + (e ? "" : "req") + '">' + esc(e ? T("Mã PIN mới (để trống nếu không đổi)") : T("Mã PIN (4–8 số)")) + '</label><input id="apin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></div>';
   if (e && V.p.id !== S.user.id) h += '<div class="ck ' + (F.active ? "on" : "") + '" onclick="F.active=!F.active;this.classList.toggle(\'on\',F.active)"><span class="bx">' + ic("ok") + '</span><span>' + esc(T("Đang hoạt động (bỏ chọn để khoá)")) + '</span></div>';
   h += '<button class="btn" style="margin-top:10px" onclick="saveAcc()">' + ic("ok") + T("LƯU TÀI KHOẢN") + '</button>';
@@ -1128,9 +1267,11 @@ async function saveAcc(){
   if (!/^[A-Z0-9._-]{2,20}$/.test(id)){ toast(T("Mã NV không hợp lệ (chữ, số, 2–20 ký tự)"), "err"); return; }
   if (!name){ toast(T("Nhập họ tên"), "err"); return; }
   if ((!e || pin) && !/^\d{4,8}$/.test(pin)){ toast(T("PIN phải gồm 4–8 chữ số"), "err"); return; }
-  if (!isAdmin() && F.role !== "worker"){ toast(T("Không có quyền"), "err"); return; }
+  if (!isAdmin() && F.role !== "worker" && F.role !== "leader"){ toast(T("Không có quyền"), "err"); return; }
+  const dept = $("#adept").value;
+  if (!dept){ toast(T("Chọn bộ phận"), "err"); return; }
   if (!e && S.acc[id]){ toast(T("Mã NV {c} đã tồn tại", {c: id}), "err"); return; }
-  const d = {name, role: F.role, area: $("#aarea").value.trim(), active: e ? F.active : true};
+  const d = {name, role: F.role, dept, active: e ? F.active : true};
   if (pin){ d.salt = uid(); d.hash = await sha256(d.salt + ":" + pin); }
   if (!e){ d.createdAt = Date.now(); d.createdBy = S.user.id; }
   put("accounts", id, d, !!e);
@@ -1139,7 +1280,8 @@ async function saveAcc(){
 
 /* ---- Cài đặt ---- */
 VIEWS.settings = {mgr: true, title: () => T("Cài đặt danh mục"), html(){
-  return '<div class="lc"><label>' + esc(T("Nhóm máy (mỗi dòng 1 mục)")) + '</label><textarea id="sgroups" rows="6">' + esc((S.cfg.groups || []).join("\n")) + '</textarea>' +
+  return '<div class="lc"><label>' + esc(T("Bộ phận (mỗi dòng 1 mục)")) + '</label><textarea id="sdepts" rows="5">' + esc((S.cfg.depts || []).join("\n")) + '</textarea></div>' +
+    '<div class="lc"><label>' + esc(T("Nhóm máy (mỗi dòng 1 mục)")) + '</label><textarea id="sgroups" rows="6">' + esc((S.cfg.groups || []).join("\n")) + '</textarea>' +
       '<div class="mu sm" style="margin-top:4px">' + esc(T("Nhóm \"Máy đan\" sẽ có thêm ô Loại máy: 7G, 8G, 10G, 13G, 15G.")) + '</div></div>' +
     '<div class="lc"><label>' + esc(T("Danh mục linh kiện (mỗi dòng 1 mục)")) + '</label><textarea id="sparts" rows="6">' + esc((S.cfg.parts || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Khu vực / xưởng (mỗi dòng 1 mục)")) + '</label><textarea id="sareas" rows="6">' + esc((S.cfg.areas || []).join("\n")) + '</textarea></div>' +
@@ -1148,7 +1290,7 @@ VIEWS.settings = {mgr: true, title: () => T("Cài đặt danh mục"), html(){
 }};
 function saveCfg(){
   const sp = id => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
-  put("config", "main", {groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), kinds: sp("#skinds")}, true); savedMsg(); back();
+  put("config", "main", {depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), kinds: sp("#skinds")}, true); savedMsg(); back();
 }
 /* ---- Xuất CSV ---- */
 VIEWS.export = {mgr: true, title: () => T("Xuất dữ liệu"), html(){
@@ -1348,6 +1490,39 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Quản trị chỉ theo dõi, không ghi kết quả bảo trì.": "管理者は閲覧のみで、保全結果は記録できません。",
+"Quản trị chỉ theo dõi, không báo sự cố.": "管理者は閲覧のみで、異常報告はできません。",
+"{n} báo cáo của bạn chưa sửa xong": "未修理のあなたの報告 {n} 件",
+"{n} đang chờ duyệt": "承認待ち {n} 件",
+"Đã sửa: {f}": "修理内容：{f}",
+"Sửa nội dung báo cáo": "報告内容を修正",
+"Người báo cập nhật tình trạng; quản đốc duyệt sau khi sửa xong.": "状況は報告者が更新し、修理完了後に職長が承認します。",
+
+"Tổ trưởng": "班長",
+"Bộ phận": "部署",
+"— Chọn bộ phận —": "— 部署を選択 —",
+"Chọn bộ phận": "部署を選んでください",
+"Bộ phận (mỗi dòng 1 mục)": "部署（1行に1項目）",
+"Quản đốc tạo và sửa được tài khoản Tổ trưởng, Công nhân.": "職長は班長・作業者のアカウントを作成・編集できます。",
+"Chờ duyệt": "承認待ち",
+"Đã duyệt": "承認済み",
+"Duyệt": "承認",
+"{n} báo cáo sự cố chờ duyệt": "承認待ちの異常報告 {n} 件",
+"{n} báo cáo của bạn đang chờ duyệt": "あなたの報告 {n} 件が承認待ちです",
+"Không có báo cáo nào chờ duyệt.": "承認待ちの報告はありません。",
+"Người báo đã sửa": "報告者による修正",
+"{n} lần, gần nhất {t}": "{n} 回（最終 {t}）",
+"Báo cáo đang chờ quản đốc duyệt. Bạn vẫn sửa lại được cho đến khi được duyệt.": "この報告は職長の承認待ちです。承認されるまでは修正できます。",
+"Sửa báo cáo": "報告を修正",
+"DUYỆT BÁO CÁO": "報告を承認",
+"Ghi hướng xử lý hoặc bấm Đã sửa xong bên dưới cũng tính là đã duyệt.": "下で対応方針を記録するか「修理完了」を押した場合も承認扱いになります。",
+"Đã duyệt báo cáo": "報告を承認しました",
+"Sửa báo cáo sự cố": "異常報告の修正",
+"Báo cáo đã được duyệt hoặc không phải của bạn, không sửa được.": "承認済み、またはご自身の報告ではないため修正できません。",
+"LƯU THAY ĐỔI": "変更を保存",
+"Báo cáo đã được duyệt, không sửa được nữa.": "承認済みのため修正できません。",
+"Đã gửi, chờ quản đốc duyệt": "送信しました。職長の承認待ちです",
+
 "Nhóm máy": "設備グループ",
 "Loại máy": "機種（ゲージ）",
 "— Chọn nhóm máy —": "— 設備グループを選択 —",
