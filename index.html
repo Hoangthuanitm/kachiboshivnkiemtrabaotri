@@ -173,31 +173,8 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
   .lbl{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 @media (min-width:700px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
-/* ===== Máy tính bảng ===== */
-.h3top{margin-top:4px}
+.h3top{margin-top:18px}
 .rgrid{margin-top:14px}
-@media (min-width:700px){
-  main{max-width:780px;padding-left:20px;padding-right:20px}
-  main.wide{max-width:1180px}
-  .lst{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 12px}
-  .rgrid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:12px;align-items:stretch}
-  .rgrid .card{margin-bottom:12px}
-}
-@media (min-width:900px){
-  body{padding-left:96px}
-  .top{margin-left:-96px}
-  nav.bn{top:0;right:auto;width:96px;flex-direction:column;justify-content:flex-start;border-top:0;border-right:1px solid var(--bd);padding-top:calc(72px + env(safe-area-inset-top));box-shadow:none;z-index:25}
-  nav.bn button{flex:none;min-height:80px;font-size:13px}
-  nav.bn button.on{background:var(--gl)}
-  nav.bn button.on:before{top:12px;bottom:12px;left:0;right:auto;width:4px;height:auto;border-radius:0 4px 4px 0}
-  nav.bn .bd{top:10px}
-  main{padding-bottom:32px}
-  .toast{bottom:28px;left:calc(50% + 48px)}
-  .hgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:24px;align-items:start}
-  .hgrid .lst{display:block}
-  .bigscan{min-height:150px}
-  .kpi{min-height:120px}
-}
 </style>
 </head>
 <body>
@@ -208,7 +185,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "21/10/2026 10:30";
+const VERSION = "21/10/2026 11:00";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyAfy4QMD9_7PyFHpInNdKDRWuW4AYCtLJ4",
