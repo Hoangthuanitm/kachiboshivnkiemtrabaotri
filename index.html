@@ -138,6 +138,7 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .sel{width:30px;height:30px;border-radius:8px;border:2.5px solid #9aa39d;display:flex;align-items:center;justify-content:center;flex:none;color:#fff}
 .sel.on{background:var(--g);border-color:var(--g)}
 .sel svg.i{width:20px;height:20px;stroke-width:3}
+.nl{padding:10px 0;border-bottom:1px solid var(--bd)}.nl:last-child{border-bottom:0}
 .hl{background:var(--yl);border-radius:12px;padding:10px 12px;font-size:15px;margin-bottom:12px}
 /* Labels */
 #print-area{display:none}
@@ -185,7 +186,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "21/10/2026 11:00";
+const VERSION = "21/10/2026 13:40";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyAfy4QMD9_7PyFHpInNdKDRWuW4AYCtLJ4",
@@ -652,7 +653,7 @@ VIEWS.incnew = {title: () => T("Báo sự cố"), html(){
   h += '<div class="lc"><label class="req">' + esc(T("Tình trạng")) + '</label><div class="opts">' +
     ["open", "done"].map(k => '<button class="opt ' + (k === "open" ? "r" : "") + ' ' + (F.st === k ? "on" : "") + '" onclick="F.st=\'' + k + '\';render(true)">' + esc(T(ISTATUS[k][0])) + '</button>').join("") + '</div>' +
     (F.st === "open" ? '<div class="mu sm" style="margin-top:4px">' + esc(T("Nếu đã tự sửa xong tại chỗ thì chọn \"Đã sửa xong\".")) + '</div>' : "") + '</div>';
-  if (F.st === "done") h += '<div class="lc"><label class="req">' + esc(T("Đã sửa thế nào")) + '</label><textarea oninput="F.fix=this.value">' + esc(F.fix) + '</textarea></div>';
+  if (F.st === "done") h += '<div class="lc"><label class="req">' + esc(T("Đã sửa như thế nào")) + '</label><textarea oninput="F.fix=this.value">' + esc(F.fix) + '</textarea></div>';
   h += '<div class="lc"><label>' + esc(T("Ảnh hiện trường")) + ' <span class="mu sm">(' + esc(T("tối đa 3 ảnh")) + ')</span></label>' + photoBox(3) + '</div>';
   h += '<button class="btn r" onclick="saveInc()">' + ic("alert") + T("GỬI BÁO CÁO SỰ CỐ") + '</button>';
   return h;
@@ -667,7 +668,7 @@ function saveInc(){
   if (!d){ toast(T("Chọn thiết bị"), "err"); return; }
   if (!(F.desc || "").trim() && !PH.length){ toast(T("Nhập mô tả hoặc chụp ảnh"), "err"); return; }
   const fix = F.st === "done" ? (F.fix || "").trim() : "";
-  if (F.st === "done" && !fix){ toast(T("Ghi lại đã sửa thế nào"), "err"); return; }
+  if (F.st === "done" && !fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
   const t = today(), now = Date.now(), pids = savePhotos(F.code);
   const doc = {devId: F.code, devName: d.name, area: d.area || "", desc: (F.desc || "").trim(), photos: pids,
     status: F.st, open: F.st !== "done", fix, next: "", by: S.user.id, byName: S.user.name, at: now, date: t, month: ym(t)};
@@ -693,45 +694,60 @@ VIEWS.incidents = {wide: true, live: true, title: () => T("Sự cố"), html(){
 }};
 
 VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
-  const i = S.incOpen[V.p.id] || S.incMonth.find(x => x._id === V.p.id) || F.incCache;
+  const i = curInc();
   if (!i || i._id !== V.p.id){
     R("incidents", V.p.id).get().then(s => { if (s.exists){ F.incCache = Object.assign({_id: V.p.id}, s.data()); render(); } });
     return '<div class="empty"><div class="spin" style="margin:auto"></div></div>';
   }
-  const k = iSt(i), s = ISTATUS[k];
+  const k = iSt(i), s = ISTATUS[k], hist = nextLog(i);
   let h = '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">' + chip(s[0], s[1]) + (k === "open" ? chip(T("{n} ngày", {n: waitDays(i)}), "m") : "") + '</div>' +
     '<div class="b" style="font-size:18px;margin-bottom:8px">' + esc(i.desc || "") + '</div><dl class="info">' +
     '<dt>' + esc(T("Thiết bị")) + '</dt><dd><a href="#" onclick="go(\'device\',{code:\'' + esc(i.devId) + '\'});return false" class="code" style="color:var(--g)">' + esc(i.devId) + '</a> · ' + esc(i.devName || "") + '</dd>' +
     '<dt>' + esc(T("Người báo")) + '</dt><dd>' + esc(i.byName) + '</dd><dt>' + esc(T("Thời gian")) + '</dt><dd>' + esc(fmtDT(i.at)) + '</dd>' +
-    (i.next ? '<dt>' + esc(T("Hướng xử lý")) + '</dt><dd>' + esc(i.next) + '</dd>' : "") +
-    (i.fix ? '<dt>' + esc(T("Khắc phục")) + '</dt><dd>' + esc(i.fix) + '</dd>' : "") +
+    (i.fix ? '<dt>' + esc(T("Đã sửa như thế nào")) + '</dt><dd>' + esc(i.fix) + '</dd>' : "") +
     (i.fixAt ? '<dt>' + esc(T("Xong lúc")) + '</dt><dd>' + esc(fmtDT(i.fixAt)) + ' · ' + esc(i.fixBy || "") + '</dd><dt>' + esc(T("Thời gian sửa")) + '</dt><dd>' + esc(fmtDur(i.fixAt - i.at)) + '</dd>' : "") +
     '</dl>' + (i.photos && i.photos.length ? '<div class="phs" id="incph" style="margin-top:12px"></div>' : "") + '</div>';
+  // Cập nhật: chọn trạng thái, nhập nội dung, một nút Lưu
   if (isMgr() && k === "open"){
-    if (F.incEdit !== i._id){ F.incEdit = i._id; F.next = i.next || ""; F.fix = ""; }
-    h += '<h3>' + esc(T("Hướng xử lý")) + '</h3><div class="lc"><textarea rows="2" oninput="F.next=this.value" placeholder="' + esc(T("Ví dụ: chờ linh kiện từ Nhật, dự kiến 30/10")) + '">' + esc(F.next) + '</textarea>' +
-      '<button class="btn w sm" style="margin-top:8px" onclick="saveNext()">' + ic("ok") + T("Lưu hướng xử lý") + '</button></div>' +
-      '<h3>' + esc(T("Hoàn thành sửa chữa")) + '</h3><div class="lc"><label class="req">' + esc(T("Đã sửa thế nào")) + '</label><textarea oninput="F.fix=this.value">' + esc(F.fix) + '</textarea></div>' +
-      '<button class="btn" onclick="fixInc()">' + ic("ok") + T("ĐÃ SỬA XONG") + '</button>';
+    if (F.incEdit !== i._id){ F.incEdit = i._id; F.ist = "open"; F.next = ""; F.fix = ""; }
+    h += '<h3>' + esc(T("Cập nhật tình trạng")) + '</h3><div class="opts" style="margin-bottom:12px">' +
+      '<button class="opt r ' + (F.ist === "open" ? "on" : "") + '" onclick="F.ist=\'open\';render(true)">' + esc(T("Đang hỏng")) + '</button>' +
+      '<button class="opt ' + (F.ist === "done" ? "on" : "") + '" onclick="F.ist=\'done\';render(true)">' + esc(T("Đã sửa xong")) + '</button></div>';
+    if (F.ist === "open")
+      h += '<div class="lc"><label class="req">' + esc(T("Hướng xử lý")) + '</label><textarea rows="3" oninput="F.next=this.value" placeholder="' + esc(T("Ví dụ: chờ linh kiện từ Nhật, dự kiến 30/10")) + '">' + esc(F.next) + '</textarea></div>';
+    else
+      h += '<div class="lc"><label class="req">' + esc(T("Đã sửa như thế nào")) + '</label><textarea rows="3" oninput="F.fix=this.value" placeholder="' + esc(T("Ví dụ: thay bạc đạn motor, chạy thử ổn định")) + '">' + esc(F.fix) + '</textarea></div>';
+    h += '<button class="btn" onclick="saveIncUpd()">' + ic("ok") + T("LƯU") + '</button>';
   }
+  // Lịch sử hướng xử lý (mới nhất ở trên)
+  if (hist.length) h += '<h3>' + esc(T("Lịch sử hướng xử lý")) + '</h3><div class="card" style="padding:4px 14px">' +
+    hist.slice().reverse().map(x => '<div class="nl"><div class="sm mu">' + esc(fmtDT(x.at)) + (x.by ? ' · ' + esc(x.by) : "") + '</div><div>' + esc(x.t) + '</div></div>').join("") + '</div>';
   return h;
 }, after(){
-  const i = S.incOpen[V.p.id] || S.incMonth.find(x => x._id === V.p.id) || F.incCache;
+  const i = curInc();
   if (i) loadPhotos(i.photos, $("#incph"));
 }};
 const curInc = () => S.incOpen[V.p.id] || S.incMonth.find(x => x._id === V.p.id) || F.incCache;
-function saveNext(){
+/* Danh sách các lần ghi hướng xử lý; dữ liệu cũ chỉ có 1 trường next thì đổi thành 1 dòng */
+const nextLog = i => Array.isArray(i.nextLog) ? i.nextLog : (i.next ? [{t: i.next, by: i.nextBy || "", at: i.nextAt || i.at}] : []);
+function saveIncUpd(){
   const i = curInc(); if (!i) return;
-  const u = {next: (F.next || "").trim(), nextBy: S.user.name, nextAt: Date.now()};
-  put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u); savedMsg();
-}
-function fixInc(){
-  const i = curInc(); if (!i) return;
-  const fix = (F.fix || "").trim();
-  if (!fix){ toast(T("Ghi lại đã sửa thế nào"), "err"); return; }
-  const u = {status: "done", open: false, fix, next: (F.next || "").trim(), fixAt: Date.now(), fixBy: S.user.name};
-  put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u);
-  savedMsg(); back();
+  const now = Date.now();
+  if (F.ist === "open"){
+    const t = (F.next || "").trim();
+    if (!t){ toast(T("Nhập hướng xử lý"), "err"); return; }
+    const log = nextLog(i).concat([{t, by: S.user.name, at: now}]);
+    const u = {next: t, nextBy: S.user.name, nextAt: now, nextLog: log};
+    put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u); F.next = "";
+    if (S.incOpen[i._id]) S.incOpen[i._id] = F.incCache;   // hiện ngay dòng vừa thêm, không chờ Firestore
+    savedMsg(); render(true);
+  } else {
+    const fix = (F.fix || "").trim();
+    if (!fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
+    const u = {status: "done", open: false, fix, fixAt: now, fixBy: S.user.name};
+    put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u);
+    savedMsg(); back();
+  }
 }
 
 /* ---- Thiết bị (quản lý) ---- */
@@ -1242,6 +1258,12 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Đã sửa như thế nào": "修理内容",
+"Nhập nội dung đã sửa như thế nào": "修理内容を入力してください",
+"Nhập hướng xử lý": "対応方針を入力してください",
+"Lịch sử hướng xử lý": "対応方針の履歴",
+"Ví dụ: thay bạc đạn motor, chạy thử ổn định": "例：モーターのベアリング交換、試運転問題なし",
+
 "Hôm nay không có việc cần làm.": "本日対応が必要な作業はありません。",
 "Việc cần làm": "対応が必要な作業",
 "Nếu đã tự sửa xong tại chỗ thì chọn \"Đã sửa xong\".": "その場で修理できた場合は「修理完了」を選んでください。",
