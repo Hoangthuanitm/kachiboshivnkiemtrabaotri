@@ -236,7 +236,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "22/10/2026 11:15";
+const VERSION = "22/10/2026 13:10";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -813,7 +813,7 @@ VIEWS.incnew = {title: () => V.p.edit ? T("Sửa báo cáo sự cố") : T("Báo
     (F.st === "open" ? '<div class="mu sm" style="margin-top:4px">' + esc(T("Nếu đã tự sửa xong tại chỗ thì chọn \"Đã sửa xong\".")) + '</div>' : "") + '</div>';
   if (F.st === "done") h += '<div class="lc"><label class="req">' + esc(T("Đã sửa như thế nào")) + '</label><textarea oninput="F.fix=this.value">' + esc(F.fix) + '</textarea></div>' + partsSection();
   const old = F.oldPh || [];
-  h += '<div class="lc"><label>' + esc(T("Ảnh hiện trường")) + ' <span class="mu sm">(' + esc(T("tối đa 3 ảnh")) + ')</span></label>' +
+  h += '<div class="lc"><label>' + esc(T("Ảnh hiện trường")) + ' <span class="mu sm">(' + esc(T("không bắt buộc, tối đa 3 ảnh")) + ')</span></label>' +
     (old.length ? '<div class="phs" style="margin-bottom:8px">' + old.map(id => '<div class="ph" id="op_' + id + '"><div class="phload">…</div><button class="x" onclick="F.oldPh.splice(F.oldPh.indexOf(\'' + id + '\'),1);render(true)">' + ic("x") + '</button></div>').join("") + '</div>' : "") +
     photoBox(Math.max(0, 3 - old.length)) + '</div>';
   h += F.edit ? '<button class="btn" onclick="saveInc()">' + ic("ok") + T("LƯU THAY ĐỔI") + '</button>'
@@ -831,7 +831,7 @@ function devSelect(id, val, onch){
 function saveInc(){
   const d = S.dev[F.code];
   if (!d){ toast(T("Chọn thiết bị"), "err"); return; }
-  if (!(F.desc || "").trim() && !PH.length && !(F.oldPh || []).length){ toast(T("Nhập mô tả hoặc chụp ảnh"), "err"); return; }
+  if (!(F.desc || "").trim() && !PH.length && !(F.oldPh || []).length){ toast(T("Nhập mô tả sự cố"), "err"); return; }
   const fix = F.st === "done" ? (F.fix || "").trim() : "";
   if (F.st === "done" && !fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
   const prow = F.st === "done" ? partsRows() : []; if (!prow) return;
@@ -1642,6 +1642,8 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"không bắt buộc, tối đa 3 ảnh": "任意・最大3枚",
+"Nhập mô tả sự cố": "不具合の内容を入力してください",
 "Xoá dữ liệu theo thời gian": "期間指定でデータ削除",
 "Chỉ Quản trị, cần mật khẩu": "管理者のみ・パスワード必要",
 "Nhật ký bảo trì": "保全記録",
