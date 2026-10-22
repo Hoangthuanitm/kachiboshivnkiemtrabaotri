@@ -236,7 +236,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "22/10/2026 10:50";
+const VERSION = "22/10/2026 11:15";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -334,6 +334,7 @@ const ICONS = {
   out:"M10 4H5v16h5M15 8l4 4-4 4M19 12H9",
   down:"M12 4v12M7 11l5 5 5-5M5 20h14",
   chart:"M4 20V11M10 20V5M16 20v-6M21 20H3",
+  trash:"M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6",
   knit:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM4.5 8.5c4.5 1.3 10.5 1.3 15 0M3.2 13.5c5.5 1.6 12 1.6 17.6 0M9 3.6c-1.6 5.3-1.6 11.5 0 16.8M15 3.6c1.4 3.4 1.6 7.2.6 11",
   sliders:"M4 6h16M4 12h16M4 18h16M8 4v4M16 10v4M10 16v4",
   globe:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9M12 3C9.5 5.5 8.5 8.5 8.5 12s1 6.5 3.5 9",
@@ -1314,6 +1315,7 @@ VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
     m("down", "Xuất dữ liệu (Excel/CSV)", "go('export')") +
     m("globe", "Ngôn ngữ", "setLang(LANG==='vi'?'ja':'vi')", LANG === "vi" ? "Tiếng Việt → 日本語" : "日本語 → Tiếng Việt") +
     m("sliders", "Cài đặt danh mục", "go('settings')") +
+    (isAdmin() ? m("trash", "Xoá dữ liệu theo thời gian", "go('purge')", T("Chỉ Quản trị, cần mật khẩu")) : "") +
     m("out", "Đăng xuất", "logout()") + '</div>' + foot();
 }};
 VIEWS.me = {title: () => T("Tôi"), html(){
@@ -1369,6 +1371,62 @@ async function saveAcc(){
   if (!e){ d.createdAt = Date.now(); d.createdBy = S.user.id; }
   put("accounts", id, d, !!e);
   savedMsg(); back();
+}
+
+/* ---- Xoá dữ liệu theo khoảng thời gian (chỉ Quản trị, mật khẩu 112) ---- */
+const PURGE_PW = "112";
+const PURGE_KINDS = [["logs", "Nhật ký bảo trì"], ["incidents", "Sự cố đã xong (kèm ảnh)"], ["parts", "Linh kiện đã thay"]];
+function monthsBetween(a, b){ const out = []; let [y, m] = a.split("-").map(Number); const [y2, m2] = b.split("-").map(Number); while (y < y2 || (y === y2 && m <= m2)){ out.push(y + "-" + pad(m)); if (++m > 12){ m = 1; y++; } } return out; }
+VIEWS.purge = {mgr: true, title: () => T("Xoá dữ liệu theo thời gian"), html(){
+  if (!isAdmin()) return empty("trash", T("Không có quyền"));
+  if (!F.pg){ const d = new Date(); d.setMonth(d.getMonth() - 12); F = {pg: 1, from: ymd(new Date(d.getFullYear(), d.getMonth(), 1)), to: ymd(new Date(d.getFullYear(), d.getMonth() + 1, 0)), kinds: {logs: true, incidents: true, parts: true}, plan: null}; }
+  let h = '<div class="hl" style="background:var(--rl);color:var(--r)">' + esc(T("Dữ liệu bị xoá không khôi phục được. Nên xuất Excel trước khi xoá.")) + '</div>';
+  h += '<div class="grid2"><div class="lc"><label class="req">' + esc(T("Từ ngày")) + '</label><input id="pgf" type="date" value="' + F.from + '" onchange="F.from=this.value;F.plan=null;pgShow()"></div>' +
+    '<div class="lc"><label class="req">' + esc(T("Đến ngày")) + '</label><input id="pgt" type="date" value="' + F.to + '" onchange="F.to=this.value;F.plan=null;pgShow()"></div></div>';
+  h += '<div class="lc"><label>' + esc(T("Loại dữ liệu cần xoá")) + '</label>' + PURGE_KINDS.map(([k, l]) => '<div class="ck ' + (F.kinds[k] ? "on" : "") + '" onclick="F.kinds.' + k + '=!F.kinds.' + k + ';this.classList.toggle(\'on\',F.kinds.' + k + ');F.plan=null;pgShow()"><span class="bx">' + ic("ok") + '</span><span>' + esc(T(l)) + '</span></div>').join("") +
+    '<div class="mu sm">' + esc(T("Không xoá: danh sách máy, kế hoạch, tài khoản, danh mục. Sự cố chưa sửa xong hoặc đang chờ duyệt được giữ lại.")) + '</div></div>';
+  h += '<button class="btn w" onclick="pgCheck()">' + ic("search") + T("Kiểm tra số lượng sẽ xoá") + '</button><div id="pgres" style="margin-top:12px"></div>';
+  return h;
+}, after(){ pgShow(); }};
+function pgShow(){
+  const el = $("#pgres"); if (!el) return;
+  if (!F.plan){ el.innerHTML = ""; return; }
+  const P = F.plan, tot = P.logs.length + P.incidents.length + P.parts.length + P.photos.length;
+  el.innerHTML = '<div class="card"><div class="b" style="margin-bottom:6px">' + esc(T("Từ {a} đến {b} sẽ xoá:", {a: fmtD(F.from), b: fmtD(F.to)})) + '</div>' +
+    '<dl class="info"><dt>' + esc(T("Nhật ký bảo trì")) + '</dt><dd>' + P.logs.length + '</dd><dt>' + esc(T("Sự cố")) + '</dt><dd>' + P.incidents.length + '</dd><dt>' + esc(T("Ảnh")) + '</dt><dd>' + P.photos.length + '</dd><dt>' + esc(T("Linh kiện đã thay")) + '</dt><dd>' + P.parts.length + '</dd></dl></div>' +
+    (tot ? '<div class="lc"><label class="req">' + esc(T("Mật khẩu xoá")) + '</label><input id="pgpw" class="pin" type="password" inputmode="numeric" autocomplete="off"></div>' +
+      '<button class="btn r" onclick="pgRun()">' + ic("trash") + T("XOÁ {n} BẢN GHI", {n: tot}) + '</button>' : empty("ok", T("Không có dữ liệu nào trong khoảng này.")));
+}
+async function pgCheck(){
+  if (!isAdmin()) return;
+  if (!F.from || !F.to || F.from > F.to){ toast(T("Khoảng ngày không hợp lệ"), "err"); return; }
+  if (!PURGE_KINDS.some(([k]) => F.kinds[k])){ toast(T("Chọn ít nhất một loại dữ liệu"), "err"); return; }
+  busy(true);
+  try {
+    const months = monthsBetween(F.from.slice(0, 7), F.to.slice(0, 7)), inRange = x => x.date >= F.from && x.date <= F.to, P = {logs: [], incidents: [], parts: [], photos: []};
+    for (const m of months){
+      if (F.kinds.logs) P.logs.push(...docs("logs", await Q("logs", "month", m).get()).filter(inRange));
+      if (F.kinds.incidents) P.incidents.push(...docs("incidents", await Q("incidents", "month", m).get()).filter(i => inRange(i) && iSt(i) === "done" && isLocked(i)));
+      if (F.kinds.parts) P.parts.push(...docs("parts", await Q("parts", "month", m).get()).filter(inRange));
+    }
+    P.photos = Array.from(new Set(P.logs.concat(P.incidents).flatMap(x => x.photos || [])));
+    F.plan = P; pgShow();
+  } catch(e){ onErr(e); } finally { busy(false); }
+}
+async function pgRun(){
+  if (!isAdmin() || !F.plan) return;
+  const pw = ($("#pgpw") || {}).value || "";
+  if (pw !== PURGE_PW){ toast(T("Sai mật khẩu xoá"), "err"); return; }
+  const P = F.plan, refs = P.logs.map(x => R("logs", x._id)).concat(P.incidents.map(x => R("incidents", x._id)), P.parts.map(x => R("parts", x._id)), P.photos.map(id => R("photos", id)));
+  if (!confirm(T("Xoá vĩnh viễn {n} bản ghi từ {a} đến {b}?", {n: refs.length, a: fmtD(F.from), b: fmtD(F.to)}))) return;
+  busy(true);
+  try {
+    for (let i = 0; i < refs.length; i += 400){ const b = FS.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await withTimeout(b.commit(), 60000); }
+    F.repCache = {}; F.plan = null; F.histFor = "";
+    toast(T("Đã xoá {n} bản ghi", {n: refs.length}), "ok"); pgShow();
+  } catch(e){
+    if (e && e.code === "permission-denied") toast(T("Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules."), "err"); else onErr(e);
+  } finally { busy(false); }
 }
 
 /* ---- Cài đặt ---- */
@@ -1584,6 +1642,27 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Xoá dữ liệu theo thời gian": "期間指定でデータ削除",
+"Chỉ Quản trị, cần mật khẩu": "管理者のみ・パスワード必要",
+"Nhật ký bảo trì": "保全記録",
+"Sự cố đã xong (kèm ảnh)": "完了済みの異常（写真含む）",
+"Dữ liệu bị xoá không khôi phục được. Nên xuất Excel trước khi xoá.": "削除したデータは復元できません。削除前にExcel出力をお勧めします。",
+"Từ ngày": "開始日",
+"Đến ngày": "終了日",
+"Loại dữ liệu cần xoá": "削除するデータの種類",
+"Không xoá: danh sách máy, kế hoạch, tài khoản, danh mục. Sự cố chưa sửa xong hoặc đang chờ duyệt được giữ lại.": "設備一覧・計画・アカウント・マスタは削除しません。未修理または承認待ちの異常は残ります。",
+"Kiểm tra số lượng sẽ xoá": "削除件数を確認",
+"Từ {a} đến {b} sẽ xoá:": "{a}〜{b} の削除対象：",
+"Mật khẩu xoá": "削除パスワード",
+"XOÁ {n} BẢN GHI": "{n} 件を削除",
+"Không có dữ liệu nào trong khoảng này.": "この期間のデータはありません。",
+"Khoảng ngày không hợp lệ": "期間が正しくありません",
+"Chọn ít nhất một loại dữ liệu": "データの種類を1つ以上選んでください",
+"Sai mật khẩu xoá": "削除パスワードが違います",
+"Xoá vĩnh viễn {n} bản ghi từ {a} đến {b}?": "{a}〜{b} の {n} 件を完全に削除しますか？",
+"Đã xoá {n} bản ghi": "{n} 件を削除しました",
+"Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules.": "Security Rulesで削除がブロックされています。Firestore Rulesで削除を許可してください。",
+
 "— Chọn mã hàng —": "— 品番を選択 —",
 "Chưa có mã hàng. Thêm trong Cài đặt danh mục → Mã hàng máy đan.": "品番が未登録です。マスタ設定 → 編み機の品番 で追加してください。",
 
