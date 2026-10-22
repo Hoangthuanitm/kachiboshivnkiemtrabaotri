@@ -236,7 +236,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "22/10/2026 13:30";
+const VERSION = "22/10/2026 14:25";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -365,6 +365,8 @@ const isKnit = g => String(g || "").trim().toLowerCase() === "máy đan";
 const groupLabel = d => d && d.group ? d.group + (d.gauge ? " " + d.gauge : "") : "";
 const chip = (t, c) => '<span class="chip ' + c + '">' + esc(T(t)) + '</span>';
 /* Trạng thái máy không nhập tay: "Đang hỏng" khi còn sự cố chưa sửa xong */
+/* Sự cố đang mở (cũ nhất) của một máy, nếu có */
+const openIncOf = code => Object.values(S.incOpen).filter(i => i.devId === code).sort((a, b) => a.at - b.at)[0];
 function devState(d){
   if (!d) return DSTATUS.ok;
   if (d.status === "off") return DSTATUS.off;
@@ -626,7 +628,8 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
       (d.since ? '<dt>' + esc(T("Ngày sử dụng")) + '</dt><dd>' + esc(fmtD(d.since)) + '</dd>' : "") +
       (d.note ? '<dt>' + esc(T("Ghi chú")) + '</dt><dd>' + esc(d.note) + '</dd>' : "") +
     '</dl></div>';
-  h += '<div class="btns" style="margin-bottom:6px">' + (isWatcher() ? "" : '<button class="btn r" onclick="go(\'incnew\',{code:\'' + c + '\'})">' + ic("alert") + T("Báo sự cố") + '</button>') +
+  h += '<div class="btns" style="margin-bottom:6px">' + (isWatcher() ? "" : incs.length ? '<button class="btn y" onclick="go(\'incident\',{id:\'' + openIncOf(c)._id + '\'})">' + ic("edit") + T("Cập nhật tình trạng") + '</button>'
+      : '<button class="btn r" onclick="go(\'incnew\',{code:\'' + c + '\'})">' + ic("alert") + T("Báo sự cố") + '</button>') +
     (isMgr() ? '<button class="btn w" onclick="go(\'devform\',{code:\'' + c + '\'})">' + ic("edit") + T("Sửa") + '</button>' : "") + '</div>';
   if (incs.length) h += '<h3>' + esc(T("Sự cố chưa xong")) + '</h3>' + incs.map(incItem).join("");
   h += '<h3>' + esc(T("Kế hoạch bảo trì")) + '</h3>' + (plans.length ? plans.map(p => planItem(p)).join("") : empty("cal", T("Chưa có kế hoạch")));
@@ -811,6 +814,10 @@ VIEWS.incnew = {title: () => V.p.edit ? T("Sửa báo cáo sự cố") : T("Báo
   h += '<div class="lc"><label class="req">' + esc(T("Thiết bị")) + '</label>';
   if (d) h += '<div class="it" style="cursor:default"><div class="f"><div class="t1 code">' + esc(F.code) + '</div><div class="t2">' + esc(d.name) + '</div></div><button class="btn sm w" onclick="F.code=\'\';V.p.code=\'\';render()">' + esc(T("Đổi")) + '</button></div>';
   else h += '<div class="btns"><button class="btn" onclick="openScan(\'inc\')">' + ic("qr") + T("Quét QR") + '</button></div><div style="margin-top:8px">' + devSelect("incdev", "") + '</div>';
+  const oi = !F.edit && d && openIncOf(F.code);
+  if (oi) return h + '</div><div class="hl">' + esc(T("Máy này đang hỏng, đã có báo cáo của {n} lúc {t}. Không cần báo lại, chỉ cần cập nhật tình trạng.", {n: oi.byName || "", t: fmtDT(oi.at)})) +
+    '<div class="b" style="margin-top:6px">' + esc(oi.desc || "") + '</div></div>' +
+    '<button class="btn y" style="margin-top:12px" onclick="go(\'incident\',{id:\'' + oi._id + '\'},true)">' + ic("edit") + T("Cập nhật tình trạng") + '</button>';
   h += '</div><div class="lc"><label class="req">' + esc(T("Mô tả sự cố")) + '</label><textarea id="idesc" oninput="F.desc=this.value" placeholder="' + esc(T("Ví dụ: máy kêu to, rò dầu, không chạy…")) + '">' + esc(F.desc) + '</textarea></div>';
   h += '<div class="lc"><label class="req">' + esc(T("Tình trạng")) + '</label><div class="opts">' +
     ["open", "done"].map(k => '<button class="opt ' + (k === "open" ? "r" : "") + ' ' + (F.st === k ? "on" : "") + '" onclick="F.st=\'' + k + '\';render(true)">' + esc(T(ISTATUS[k][0])) + '</button>').join("") + '</div>' +
@@ -835,6 +842,7 @@ function devSelect(id, val, onch){
 function saveInc(){
   const d = S.dev[F.code];
   if (!d){ toast(T("Chọn thiết bị"), "err"); return; }
+  if (!F.edit && openIncOf(F.code)){ go("incident", {id: openIncOf(F.code)._id}, true); return; }
   if (!(F.desc || "").trim() && !PH.length && !(F.oldPh || []).length){ toast(T("Nhập mô tả sự cố"), "err"); return; }
   const fix = F.st === "done" ? (F.fix || "").trim() : "";
   if (F.st === "done" && !fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
@@ -1646,6 +1654,7 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Máy này đang hỏng, đã có báo cáo của {n} lúc {t}. Không cần báo lại, chỉ cần cập nhật tình trạng.": "この設備は故障中で、{n}さんが{t}に報告済みです。再報告は不要です。状況を更新してください。",
 "Người sửa xong": "修理完了者",
 "Báo: {n}": "報告: {n}",
 "Sửa xong: {n}": "修理: {n}",
