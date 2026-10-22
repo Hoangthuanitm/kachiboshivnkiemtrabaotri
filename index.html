@@ -155,17 +155,18 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .fc.pc{font-family:ui-monospace,Menlo,Consolas,monospace}
 .knbar{border:1.5px solid #e6dc7a}
 @media (min-width:700px){.knbar{position:sticky;top:64px;z-index:5;box-shadow:0 4px 12px rgba(0,0,0,.08)}}
-.knt{flex:1 1 260px;min-width:0}
+.knt{flex:1 1 140px;min-width:0;font-size:17px}
+.kncount{display:inline-block;border-radius:14px;background:#fff;border:1.5px solid var(--g);color:var(--g2);font-size:14px;padding:1px 10px;margin-left:6px}
 @media (max-width:699px){
   #knsave{position:fixed;left:12px;right:12px;width:auto;bottom:calc(74px + env(safe-area-inset-bottom));z-index:20;box-shadow:0 6px 18px rgba(0,0,0,.25)}
   main.v-knit{padding-bottom:170px}
-  .prodband small{display:none}
 }
 .stepn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--g);color:#fff;font-size:13px;margin-right:8px}
-.prodband{background:var(--y);color:#2a2a00;padding:6px 12px;display:flex;align-items:baseline;gap:8px;min-height:38px}
-.prodband small{font-size:12px;font-weight:600;opacity:.75}
-.prodband b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prodband.none{background:#eceeec;color:var(--mu)}.prodband.none b{font-family:inherit;font-size:15px}
+.prodband{background:var(--y);color:#2a2a00;padding:6px 12px 7px;display:flex;flex-direction:column;justify-content:center;min-height:52px}
+.prodband small{font-size:11px;font-weight:600;opacity:.75;line-height:1.2}
+.prodband b{font-size:16px;line-height:1.2;letter-spacing:.2px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.prodband b.sm{font-size:14px}.prodband b.xs{font-size:12.5px;-webkit-line-clamp:3}
+.prodband.none{background:#eceeec;color:var(--mu)}.prodband.none b{font-weight:600;font-size:14px}
 .gbadge{position:absolute;left:8px;bottom:8px;background:var(--g2);color:#fff;font-weight:800;font-size:13px;border-radius:8px;padding:2px 8px}
 .dt .pic{position:relative}
 /* Thiết bị dạng ô */
@@ -235,7 +236,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "22/10/2026 10:00";
+const VERSION = "22/10/2026 10:50";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -627,7 +628,6 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
   if (incs.length) h += '<h3>' + esc(T("Sự cố chưa xong")) + '</h3>' + incs.map(incItem).join("");
   h += '<h3>' + esc(T("Kế hoạch bảo trì")) + '</h3>' + (plans.length ? plans.map(p => planItem(p)).join("") : empty("cal", T("Chưa có kế hoạch")));
   if (isMgr()) h += '<button class="btn gh" onclick="go(\'planform\',{dev:\'' + c + '\'})">' + ic("plus") + T("Thêm kế hoạch cho máy này") + '</button>';
-  if (isKnit(d.group)) h += '<h3>' + esc(T("Lịch sử mã hàng")) + '</h3><div id="prodhist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
   h += '<h3>' + esc(T("Linh kiện đã thay")) + '</h3><div id="phist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
   h += '<h3>' + esc(T("Lịch sử gần đây")) + '</h3><div id="hist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
   return h;
@@ -635,8 +635,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
   const c = V.p.code; if (!S.dev[c]) return;
   qrSvg(qrText(c)).then(s => { const e = $("#devqr"); if (e) e.innerHTML = s; }).catch(() => {});
   if (F.histFor === c && F.hist){ drawHist(); return; }
-  Promise.all([Q("logs", "devId", c).get(), Q("incidents", "devId", c).get(), Q("parts", "devId", c).get(), isKnit(S.dev[c].group) ? Q("prodlog", "devId", c).get() : null]).then(([a, b, p, pl]) => {
-    F.prodh = pl ? docs("prodlog", pl).sort((x, y) => y.at - x.at) : [];
+  Promise.all([Q("logs", "devId", c).get(), Q("incidents", "devId", c).get(), Q("parts", "devId", c).get()]).then(([a, b, p]) => {
     F.histFor = c;
     F.hist = docs("logs", a).map(x => Object.assign(x, {_k: "log"})).concat(docs("incidents", b).map(x => Object.assign(x, {_k: "inc"}))).sort((x, y) => y.at - x.at).slice(0, 15);
     F.phist = docs("parts", p).sort((x, y) => y.at - x.at);
@@ -644,10 +643,6 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
   }).catch(e => { ["#hist", "#phist"].forEach(id => { const el = $(id); if (el) el.innerHTML = empty("clock", T("Không tải được lịch sử")); }); });
 }};
 function drawHist(){
-  const ph = $("#prodhist");
-  if (ph) ph.innerHTML = (F.prodh || []).length ? '<div class="card" style="padding:4px 14px">' + F.prodh.slice(0, 10).map(x => '<div class="nl"><div class="row"><span class="f"><b>' + esc(x.product || T("(Không chạy hàng)")) + '</b>' +
-      (x.from ? ' <span class="sm mu">← ' + esc(x.from) + '</span>' : "") + '</span><span class="sm mu">' + esc(fmtDT(x.at)) + '</span></div><div class="sm mu">' + esc(x.byName || "") + '</div></div>').join("") + '</div>'
-    : empty("knit", T("Chưa có lịch sử mã hàng"));
   // linh kiện đã thay của máy: tổng theo loại + các lần thay gần nhất
   const pe = $("#phist"), P = F.phist || [];
   if (pe){
@@ -967,8 +962,13 @@ const canSetProd = () => S.user.role === "manager";
 VIEWS.knit = {wide: true, live: true, title: () => T("Máy đan"), html(){
   if (!F.kn) F = {kn: 1, sel: {}, mode: false, g: "", p: null};
   const all = knitDevs();
-  if (!all.length) return empty("knit", S.loaded.dev ? T("Chưa có máy nào thuộc nhóm Máy đan.") : "…");
+  if (!all.length){
+    if (!S.loaded.dev) return '<div class="empty"><div class="spin" style="margin:auto"></div></div>';
+    return empty("knit", T("Chưa có máy nào thuộc nhóm Máy đan.")) + '<div class="hl">' + esc(T("Để máy hiện ở đây: vào Thiết bị → chọn máy → Sửa → Nhóm máy chọn \"Máy đan\" và chọn Loại máy (7G–15G).")) + '</div>' +
+      (isMgr() ? '<button class="btn" onclick="go(\'devices\')">' + ic("box") + T("Đi tới Thiết bị") + '</button>' : "");
+  }
   let h = "";
+  if (!canSetProd()) h += '<div class="mu sm" style="margin:0 2px 10px">' + esc(T("Chỉ tài khoản Quản đốc mới thêm được mã hàng. Bạn đang đăng nhập: {r}.", {r: T(ROLES[S.user.role] || "")})) + '</div>';
   if (canSetProd()) h += F.mode ? '<div class="hl knbar" id="knpanel">' + knPanel() + '</div>'
     : '<button class="btn" style="margin-bottom:12px" onclick="F.mode=true;F.prod=\'\';render(true)">' + ic("plus") + T("Thêm mã hàng") + '</button>';
   // lọc theo loại máy (7G–15G)
@@ -991,65 +991,43 @@ function drawKnit(){
   const n = $("#knN"); if (n) n.textContent = Object.keys(F.sel).filter(k => F.sel[k]).length;
   const t = $("#knsavet"); if (t) t.textContent = knSaveLabel();
 }
+const pSize = p => !p ? "" : p.length > 22 ? "xs" : p.length > 13 ? "sm" : "";   // mã dài: chữ nhỏ lại để không bị cắt
 function knitTile(d){
   const s = devState(d), k = s[2], on = F.mode && F.sel[d._id];
   return '<div class="dt kt ' + k + (on ? " picked" : "") + '" onclick="' + (F.mode ? "F.sel['" + d._id + "']=!F.sel['" + d._id + "'];drawKnit()" : "go('device',{code:'" + d._id + "'})") + '">' +
     (F.mode ? '<span class="sel ' + (on ? "on" : "") + '">' + ic("ok") + '</span>' : "") +
     '<span class="dst">' + chip(s[0], s[1]) + '</span>' +
     '<div class="pic"><i class="mimg"></i>' + (d.gauge ? '<span class="gbadge">' + esc(d.gauge) + '</span>' : "") + '</div>' +
-    '<div class="prodband' + (d.product ? "" : " none") + '"><small>' + esc(T("Mã hàng")) + '</small><b>' + esc(d.product || T("Chưa có")) + '</b></div>' +
+    '<div class="prodband' + (d.product ? "" : " none") + '"><small>' + esc(T("Mã hàng")) + '</small><b class="' + pSize(d.product) + '">' + esc(d.product || T("Chưa có")) + '</b></div>' +
     '<div class="dtb"><div class="code dcd">' + esc(d._id) + '</div><div class="dnm">' + esc(d.name || "") + '</div>' +
     '<div class="dmeta">' + esc(d.product && d.productSince ? T("từ {t}", {t: fmtDT(d.productSince)}) : (d.area || "")) + '</div></div></div>';
 }
 /* Bảng thêm mã hàng: bước 1 chọn máy (chạm vào ô), bước 2 chọn mã hàng, rồi lưu */
 function knPanel(){
   const n = Object.keys(F.sel).filter(k => F.sel[k]).length, P = S.cfg.products || [];
-  return '<div class="row" style="flex-wrap:wrap;gap:8px"><div class="b knt"><span class="stepn">1</span>' + esc(T("Chạm vào các máy cần thêm mã hàng")) + ' — ' + esc(T("Đã chọn")) + ' <span id="knN">' + n + '</span> ' + esc(T("máy")) + '</div>' +
-      '<button class="btn sm gh" onclick="knSelAll()">' + esc(T("Chọn tất cả đang hiện")) + '</button><button class="btn sm w" onclick="F.mode=false;F.sel={};render(true)">' + esc(T("Huỷ")) + '</button></div>' +
-    '<div class="b" style="margin:12px 0 6px"><span class="stepn">2</span>' + esc(T("Chọn mã hàng")) + '</div>' +
-    (P.length ? '<div class="fchips">' + P.map((p, i) => '<button class="fc pc' + (F.prod === p ? " on" : "") + '" onclick="F.prod=S.cfg.products[' + i + '];knPick()">' + esc(p) + '</button>').join("") + '</div>' : "") +
-    '<div class="row"><input id="kprod" class="code f" style="text-transform:uppercase" autocapitalize="characters" placeholder="' + esc(T("Hoặc gõ mã hàng mới")) + '" value="' + esc(P.indexOf(F.prod) >= 0 ? "" : (F.prod || "")) + '" oninput="F.prod=this.value.trim().toUpperCase();knPick(true)"></div>' +
-    '<button class="btn" id="knsave" style="margin-top:10px" onclick="saveProd(false, knSelected())">' + ic("ok") + '<span id="knsavet">' + esc(knSaveLabel()) + '</span></button>' +
-    '<button class="btn sm w" style="margin-top:8px;width:100%" onclick="if(knSelected().length && confirm(T(\'Bỏ mã hàng của các máy này (máy không chạy hàng)?\')))saveProd(true, knSelected())">' + T("Máy không chạy hàng") + '</button>';
+  return '<div class="row" style="flex-wrap:wrap;gap:8px"><div class="b knt"><span class="stepn">1</span>' + esc(T("Chọn máy")) + ' <span class="kncount"><span id="knN">' + n + '</span> ' + esc(T("máy")) + '</span></div>' +
+      '<button class="btn sm gh" onclick="knSelAll()">' + esc(T("Chọn tất cả")) + '</button><button class="btn sm w" onclick="F.mode=false;F.sel={};render(true)">' + esc(T("Huỷ")) + '</button></div>' +
+    '<div class="b" style="margin:12px 0 8px;font-size:17px"><span class="stepn">2</span>' + esc(T("Chọn mã hàng")) + '</div>' +
+    (P.length ? '<select id="kprod" onchange="F.prod=this.value;knPick()"><option value="">' + esc(T("— Chọn mã hàng —")) + '</option>' +
+        P.map(p => '<option' + (F.prod === p ? " selected" : "") + '>' + esc(p) + '</option>').join("") + '</select>'
+      : '<div class="mu sm">' + esc(T("Chưa có mã hàng. Thêm trong Cài đặt danh mục → Mã hàng máy đan.")) + '</div>') +
+    '<button class="btn" id="knsave" style="margin-top:10px" onclick="saveProd(false, knSelected())">' + ic("ok") + '<span id="knsavet">' + esc(knSaveLabel()) + '</span></button>';
 }
 const knSelected = () => Object.keys(F.sel).filter(k => F.sel[k] && S.dev[k]);
 const knSaveLabel = () => F.prod ? T("LƯU MÃ {p} CHO {n} MÁY", {p: F.prod, n: knSelected().length}) : T("LƯU MÃ HÀNG");
-function knPick(typed){
-  if (!typed){ const i = $("#kprod"); if (i) i.value = ""; }
-  document.querySelectorAll("#knpanel .fc").forEach(b => b.classList.toggle("on", b.textContent === F.prod));
-  const t = $("#knsavet"); if (t) t.textContent = knSaveLabel();
-}
+function knPick(){ const t = $("#knsavet"); if (t) t.textContent = knSaveLabel(); }
 function knSelAll(){ const L = knFiltered(), all = L.every(d => F.sel[d._id]); L.forEach(d => F.sel[d._id] = !all); drawKnit(); }
-function knGo(){ const codes = Object.keys(F.sel).filter(k => F.sel[k] && S.dev[k]); if (!codes.length){ toast(T("Chưa chọn máy nào"), "err"); return; } go("knitset", {codes}); }
-VIEWS.knitset = {title: () => T("Cập nhật mã hàng"), html(){
-  if (!canSetProd()) return empty("knit", T("Chỉ quản đốc cập nhật mã hàng."));
-  const codes = (V.p.codes || []).filter(c => S.dev[c]);
-  if (F.ks !== codes.join()){ F.ks = codes.join(); F.prod = ""; }
-  let h = '<div class="card"><div class="b" style="margin-bottom:8px">' + esc(T("{n} máy được chọn", {n: codes.length})) + '</div><div class="row" style="flex-wrap:wrap;gap:6px">' +
-    codes.map(c => { const d = S.dev[c]; return '<span class="chip m">' + esc(c) + (d.gauge ? " · " + esc(d.gauge) : "") + (d.product ? " · " + esc(d.product) : "") + '</span>'; }).join("") + '</div></div>';
-  const gs = Array.from(new Set(codes.map(c => S.dev[c].gauge).filter(Boolean)));
-  if (gs.length > 1) h += '<div class="hl">' + esc(T("Lưu ý: các máy được chọn khác loại ({g}).", {g: gs.join(", ")})) + '</div>';
-  h += '<div class="lc"><label class="req">' + esc(T("Mã hàng mới")) + '</label><input id="kprod" class="code" style="text-transform:uppercase" list="dl_prod" autocapitalize="characters" value="' + esc(F.prod) + '" oninput="F.prod=this.value" placeholder="' + esc(T("Chọn hoặc gõ mã hàng")) + '">' +
-    '<datalist id="dl_prod">' + (S.cfg.products || []).map(p => '<option value="' + esc(p) + '">').join("") + '</datalist>' +
-    '<div class="mu sm" style="margin-top:4px">' + esc(T("Mã hàng mới gõ lần đầu sẽ tự thêm vào danh mục.")) + '</div></div>';
-  if ((S.cfg.products || []).length) h += '<div class="fchips" style="margin-bottom:12px">' + S.cfg.products.slice(0, 24).map(p => '<button class="fc" onclick="F.prod=\'' + esc(p) + '\';document.getElementById(\'kprod\').value=F.prod">' + esc(p) + '</button>').join("") + '</div>';
-  h += '<button class="btn" onclick="saveProd()">' + ic("ok") + T("LƯU MÃ HÀNG") + '</button>' +
-    '<button class="btn w" style="margin-top:10px" onclick="if(confirm(T(\'Bỏ mã hàng của các máy này (máy không chạy hàng)?\')))saveProd(true)">' + T("Máy không chạy hàng") + '</button>';
-  return h;
-}};
 function saveProd(clear, list){
   if (!canSetProd()) return;
-  const codes = (list || V.p.codes || []).filter(c => S.dev[c]), p = clear ? "" : String(F.prod || "").trim().toUpperCase();
+  const codes = (list || []).filter(c => S.dev[c]), p = clear ? "" : String(F.prod || "").trim();
   if (!codes.length){ toast(T("Chưa chọn máy nào"), "err"); return; }
-  if (!clear && !p){ toast(T("Chọn hoặc gõ mã hàng"), "err"); return; }
+  if (!clear && !p){ toast(T("Chọn mã hàng"), "err"); return; }
   const now = Date.now(), t = today();
   codes.forEach(c => {
     const d = S.dev[c]; if ((d.product || "") === p) return;
     put("devices", c, {product: p, productSince: now, productBy: S.user.name}, true);
-    put("prodlog", uid(), {devId: c, devName: d.name || "", gauge: d.gauge || "", product: p, from: d.product || "", by: S.user.id, byName: S.user.name, at: now, date: t, month: ym(t)});
     S.dev[c] = Object.assign({}, d, {product: p, productSince: now});
   });
-  if (p && (S.cfg.products || []).indexOf(p) < 0) put("config", "main", {products: (S.cfg.products || []).concat([p])}, true);   // mã mới: thêm vào danh mục
   F = {kn: 1, sel: {}, mode: false, g: "", p: null}; F.histFor = "";
   toast(T("Đã cập nhật mã hàng cho {n} máy", {n: codes.length}), "ok"); vib();
   if (V.view === "knit") render(true); else back();
@@ -1406,7 +1384,7 @@ VIEWS.settings = {mgr: true, title: () => T("Cài đặt danh mục"), html(){
 }};
 function saveCfg(){
   const sp = id => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
-  put("config", "main", {products: sp("#sprods").map(x => x.toUpperCase()), depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), kinds: sp("#skinds")}, true); savedMsg(); back();
+  put("config", "main", {products: sp("#sprods"), depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), kinds: sp("#skinds")}, true); savedMsg(); back();
 }
 /* ---- Xuất CSV ---- */
 VIEWS.export = {mgr: true, title: () => T("Xuất dữ liệu"), html(){
@@ -1606,6 +1584,16 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"— Chọn mã hàng —": "— 品番を選択 —",
+"Chưa có mã hàng. Thêm trong Cài đặt danh mục → Mã hàng máy đan.": "品番が未登録です。マスタ設定 → 編み機の品番 で追加してください。",
+
+"Chọn máy": "設備を選択",
+"Chọn tất cả": "全選択",
+
+"Để máy hiện ở đây: vào Thiết bị → chọn máy → Sửa → Nhóm máy chọn \"Máy đan\" và chọn Loại máy (7G–15G).": "ここに表示するには：設備 → 設備を選択 → 編集 → 設備グループで「Máy đan（編み機）」を選び、機種（7G〜15G）を選択してください。",
+"Đi tới Thiết bị": "設備へ移動",
+"Chỉ tài khoản Quản đốc mới thêm được mã hàng. Bạn đang đăng nhập: {r}.": "品番の追加は職長アカウントのみ可能です。現在のログイン：{r}。",
+
 "Thêm mã hàng": "品番を追加",
 "Chạm vào các máy cần thêm mã hàng": "品番を設定する設備をタップ",
 "Chọn mã hàng": "品番を選択",
