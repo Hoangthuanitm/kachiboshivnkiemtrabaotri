@@ -236,7 +236,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "22/10/2026 13:10";
+const VERSION = "22/10/2026 13:30";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -527,15 +527,17 @@ function devItem(d, sel){
 const isWatcher = () => S.user && S.user.role === "admin";
 const isLocked = i => i.appr === true || (i.appr === undefined && iSt(i) === "done");   // dữ liệu cũ đã xong = coi như đã duyệt
 const isPend = i => iSt(i) === "done" && i.appr === false;                              // đã sửa xong, chờ quản đốc duyệt
-const canEditInc = i => !isWatcher() && !isLocked(i) && i.by === S.user.id;
-const canApprove = i => isPend(i) && S.user.role === "manager" && i.by !== S.user.id;
+const canEditInc = i => !isWatcher() && !isLocked(i) && (i.by === S.user.id || (isPend(i) && i.fixById === S.user.id));   // người báo, hoặc người đã sửa xong (trước khi duyệt)
+const canUpdInc = i => !isWatcher() && iSt(i) === "open";   // ai cũng cập nhật / sửa tiếp được máy đang hỏng
+const canApprove = i => isPend(i) && S.user.role === "manager" && (i.fixById || i.by) !== S.user.id;
 const autoAppr = () => S.user.role === "manager";
 function incItem(i){
   const k = iSt(i), s = ISTATUS[k];
   return '<div class="it ' + (k === "done" ? "" : "r") + '" onclick="go(\'incident\',{id:\'' + i._id + '\'})"><div class="f">' +
     '<div class="t1">' + esc(i.desc || T("Sự cố")) + '</div>' +
     '<div class="t2"><span class="code">' + esc(i.devId) + '</span> · ' + esc(i.devName || devName(i.devId)) + ' · ' + esc(fmtDT(i.at)) + '</div>' +
-    (k === "open" && i.next ? '<div class="t2" style="color:var(--a)">➜ ' + esc(i.next) + '</div>' : "") + '</div>' +
+    '<div class="t2">' + esc(T("Báo: {n}", {n: i.byName || ""})) + (i.fixBy && k === "done" ? ' · ' + esc(T("Sửa xong: {n}", {n: i.fixBy})) : "") + '</div>' +
+    (k === "open" && i.next ? '<div class="t2" style="color:var(--a)">➜ ' + esc(i.next) + (i.nextBy ? ' (' + esc(i.nextBy) + ')' : "") + '</div>' : "") + '</div>' +
     '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">' + chip(s[0], s[1]) + (isPend(i) ? chip("Chờ duyệt", "a") : "") +
     '<span class="sm mu">' + esc(k === "open" ? T("{n} ngày", {n: waitDays(i)}) : fmtDur(i.fixAt - i.at)) + '</span></div></div>';
 }
@@ -590,7 +592,7 @@ function apprItem(i){
     '<div class="t1">' + esc(i.desc || T("Sự cố")) + '</div>' +
     '<div class="t2"><span class="code">' + esc(i.devId) + '</span> · ' + esc(i.devName || devName(i.devId)) + '</div>' +
     '<div class="t2">' + esc(T("Đã sửa: {f}", {f: i.fix || ""})) + (i.parts && i.parts.length ? ' · ' + esc(i.parts.map(r => r.n + " × " + r.q).join(", ")) : "") + '</div>' +
-    '<div class="t2">' + esc((i.byName || "") + " · " + fmtDT(i.fixAt)) + '</div></div>' +
+    '<div class="t2">' + esc(T("Báo: {n}", {n: i.byName || ""}) + " · " + T("Sửa xong: {n}", {n: i.fixBy || i.byName || ""}) + " · " + fmtDT(i.fixAt)) + '</div></div>' +
     '<button class="btn sm" onclick="event.stopPropagation();approveInc(\'' + i._id + '\')">' + ic("ok") + T("Duyệt") + '</button></div>';
 }
 const stat = (n, t, c, on) => '<div class="stat"' + (on ? ' style="cursor:pointer" onclick="' + on + '"' : "") + '><b' + (c ? ' style="color:' + c + '"' : "") + '>' + n + '</b><span>' + esc(t) + '</span></div>';
@@ -804,7 +806,9 @@ VIEWS.incnew = {title: () => V.p.edit ? T("Sửa báo cáo sự cố") : T("Báo
   } else if (F.form !== "inc" || F.edit){ F = {form: "inc", st: "open", fix: "", desc: F.pre || "", code: V.p.code || "", parts: []}; PH = []; }
   else if (V.p.code && !F.code) F.code = V.p.code;
   const d = S.dev[F.code];
-  let h = '<div class="lc"><label class="req">' + esc(T("Thiết bị")) + '</label>';
+  const rep = F.edit ? ((curInc0(F.edit) || {}).byName || "") : S.user.name;
+  let h = '<div class="lc"><label>' + esc(T("Người báo")) + '</label><input value="' + esc(rep) + '" readonly style="background:#f2f2f2;font-weight:600"></div>';
+  h += '<div class="lc"><label class="req">' + esc(T("Thiết bị")) + '</label>';
   if (d) h += '<div class="it" style="cursor:default"><div class="f"><div class="t1 code">' + esc(F.code) + '</div><div class="t2">' + esc(d.name) + '</div></div><button class="btn sm w" onclick="F.code=\'\';V.p.code=\'\';render()">' + esc(T("Đổi")) + '</button></div>';
   else h += '<div class="btns"><button class="btn" onclick="openScan(\'inc\')">' + ic("qr") + T("Quét QR") + '</button></div><div style="margin-top:8px">' + devSelect("incdev", "") + '</div>';
   h += '</div><div class="lc"><label class="req">' + esc(T("Mô tả sự cố")) + '</label><textarea id="idesc" oninput="F.desc=this.value" placeholder="' + esc(T("Ví dụ: máy kêu to, rò dầu, không chạy…")) + '">' + esc(F.desc) + '</textarea></div>';
@@ -841,7 +845,7 @@ function saveInc(){
     if (!i || !canEditInc(i)){ toast(T("Báo cáo đã được duyệt, không sửa được nữa."), "err"); return; }
     const u = {devId: F.code, devName: d.name, area: d.area || "", desc: (F.desc || "").trim(), photos: (F.oldPh || []).concat(pids),
       status: F.st, open: F.st !== "done", fix, parts: prow, edits: (i.edits || []).concat([{at: now, by: S.user.name}])};
-    if (F.st === "done"){ u.fixAt = iSt(i) === "done" && i.fixAt ? i.fixAt : now; u.fixBy = S.user.name; } else { u.fixAt = null; u.fixBy = ""; }
+    if (F.st === "done"){ u.fixAt = iSt(i) === "done" && i.fixAt ? i.fixAt : now; u.fixBy = S.user.name; u.fixById = S.user.id; } else { u.fixAt = null; u.fixBy = ""; u.fixById = ""; }
     if (F.st === "done" && autoAppr()){ Object.assign(u, apprFields(i), {partsSaved: true}); saveParts(prow, F.code, "inc", i._id); }
     put("incidents", i._id, u, true);
     F.incCache = Object.assign({}, i, u, {_fresh: Date.now()}); S.incPend[i._id] = F.incCache;
@@ -853,7 +857,7 @@ function saveInc(){
   const doc = {devId: F.code, devName: d.name, area: d.area || "", desc: (F.desc || "").trim(), photos: pids,
     status: F.st, open: F.st !== "done", fix, next: "", by: S.user.id, byName: S.user.name, byRole: S.user.role, at: now, date: t, month: ym(t),
     appr: auto, apprBy: auto ? S.user.name : "", apprById: auto ? S.user.id : "", apprAt: auto ? now : null};
-  if (F.st === "done"){ doc.fixAt = now; doc.fixBy = S.user.name; doc.parts = prow; if (auto){ saveParts(prow, F.code, "inc", incId); doc.partsSaved = true; } }
+  if (F.st === "done"){ doc.fixAt = now; doc.fixBy = S.user.name; doc.fixById = S.user.id; doc.parts = prow; if (auto){ saveParts(prow, F.code, "inc", incId); doc.partsSaved = true; } }
   put("incidents", incId, doc);
   const c = F.code; F = {}; PH = [];
   toast(auto || F.st === "open" ? T("Đã lưu") : T("Đã gửi, chờ quản đốc duyệt"), "ok"); vib();
@@ -863,7 +867,7 @@ function saveInc(){
 /* ---- Danh sách sự cố ---- */
 VIEWS.incidents = {wide: true, live: true, title: () => T("Sự cố"), html(){
   const tab = ["done", "pend"].indexOf(V.p.tab) >= 0 ? V.p.tab : "open";
-  const pend = Object.values(S.incPend).filter(i => isPend(i) && (isMgr() || i.by === S.user.id)).sort((a, b) => a.fixAt - b.fixAt);
+  const pend = Object.values(S.incPend).filter(i => isPend(i) && (isMgr() || i.by === S.user.id || i.fixById === S.user.id)).sort((a, b) => a.fixAt - b.fixAt);
   const open = Object.values(S.incOpen).sort((a, b) => a.at - b.at);   // hỏng lâu nhất lên đầu
   const done = S.incMonth.filter(i => iSt(i) === "done").sort((a, b) => (b.fixAt || b.at) - (a.fixAt || a.at));
   const tb = (k, t, n, red) => '<button class="' + (tab === k ? "on" : "") + '" onclick="go(\'incidents\',{tab:\'' + k + '\'},true)">' + esc(T(t)) + (n ? '<span class="n"' + (red ? "" : ' style="background:#777"') + '>' + n + '</span>' : "") + '</button>';
@@ -886,12 +890,12 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
     (isPend(i) ? chip("Chờ duyệt", "a") : (i.apprBy ? chip(T("Đã duyệt"), "g") : "")) + '</div>' +
     '<div class="b" style="font-size:18px;margin-bottom:8px">' + esc(i.desc || "") + '</div><dl class="info">' +
     '<dt>' + esc(T("Thiết bị")) + '</dt><dd><a href="#" onclick="go(\'device\',{code:\'' + esc(i.devId) + '\'});return false" class="code" style="color:var(--g)">' + esc(i.devId) + '</a> · ' + esc(i.devName || "") + '</dd>' +
-    '<dt>' + esc(T("Người báo")) + '</dt><dd>' + esc(i.byName) + '</dd><dt>' + esc(T("Thời gian")) + '</dt><dd>' + esc(fmtDT(i.at)) + '</dd>' +
+    '<dt>' + esc(T("Người báo")) + '</dt><dd><b>' + esc(i.byName) + '</b></dd><dt>' + esc(T("Thời gian")) + '</dt><dd>' + esc(fmtDT(i.at)) + '</dd>' +
     (i.fix ? '<dt>' + esc(T("Đã sửa như thế nào")) + '</dt><dd>' + esc(i.fix) + '</dd>' : "") +
     (i.apprBy ? '<dt>' + esc(T("Duyệt")) + '</dt><dd>' + esc(fmtDT(i.apprAt)) + ' · ' + esc(i.apprBy) + '</dd>' : "") +
     (i.edits && i.edits.length ? '<dt>' + esc(T("Người báo đã sửa")) + '</dt><dd>' + esc(T("{n} lần, gần nhất {t}", {n: i.edits.length, t: fmtDT(i.edits[i.edits.length - 1].at)})) + '</dd>' : "") +
     (i.parts && i.parts.length ? '<dt>' + esc(T("Linh kiện đã thay")) + '</dt><dd>' + esc(i.parts.map(r => r.n + " × " + r.q).join(", ")) + '</dd>' : "") +
-    (i.fixAt ? '<dt>' + esc(T("Xong lúc")) + '</dt><dd>' + esc(fmtDT(i.fixAt)) + ' · ' + esc(i.fixBy || "") + '</dd><dt>' + esc(T("Thời gian sửa")) + '</dt><dd>' + esc(fmtDur(i.fixAt - i.at)) + '</dd>' : "") +
+    (i.fixAt ? '<dt>' + esc(T("Người sửa xong")) + '</dt><dd><b>' + esc(i.fixBy || "") + '</b></dd><dt>' + esc(T("Xong lúc")) + '</dt><dd>' + esc(fmtDT(i.fixAt)) + '</dd><dt>' + esc(T("Thời gian sửa")) + '</dt><dd>' + esc(fmtDur(i.fixAt - i.at)) + '</dd>' : "") +
     '</dl>' + (i.photos && i.photos.length ? '<div class="phs" id="incph" style="margin-top:12px"></div>' : "") + '</div>';
   // Người báo: sửa lại nội dung báo cáo (trước khi duyệt)
   if (canEditInc(i)){
@@ -900,9 +904,9 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
   }
   // Quản đốc: duyệt cuối cùng
   if (canApprove(i)) h += '<button class="btn y" style="margin-top:12px" onclick="approveInc()">' + ic("ok") + T("DUYỆT BÁO CÁO") + '</button>';
-  else if (k === "open" && !canEditInc(i)) h += '<div class="mu sm" style="margin-top:12px">' + esc(T("Người báo cập nhật tình trạng; quản đốc duyệt sau khi sửa xong.")) + '</div>';
+  else if (canUpdInc(i) && i.by !== S.user.id) h += '<div class="hl" style="margin-top:12px">' + esc(T("Máy do {n} báo. Bạn có thể ghi hướng xử lý hoặc sửa tiếp, tên bạn sẽ được lưu lại.", {n: i.byName || ""})) + '</div>';
   // Người báo cập nhật tình trạng: chọn trạng thái, nhập nội dung, một nút Lưu
-  if (canEditInc(i) && k === "open"){
+  if (canUpdInc(i)){
     if (F.incEdit !== i._id){ F.incEdit = i._id; F.ist = "open"; F.next = ""; F.fix = ""; F.parts = []; }
     h += '<h3>' + esc(T("Cập nhật tình trạng")) + '</h3><div class="opts" style="margin-bottom:12px">' +
       '<button class="opt r ' + (F.ist === "open" ? "on" : "") + '" onclick="F.ist=\'open\';render(true)">' + esc(T("Đang hỏng")) + '</button>' +
@@ -948,7 +952,7 @@ function saveIncUpd(){
     const fix = (F.fix || "").trim();
     if (!fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
     const prow = partsRows(); if (!prow) return;
-    const u = {status: "done", open: false, fix, fixAt: now, fixBy: S.user.name, parts: prow, partsSaved: false, appr: false};
+    const u = {status: "done", open: false, fix, fixAt: now, fixBy: S.user.name, fixById: S.user.id, parts: prow, partsSaved: false, appr: false};
     if (autoAppr()){ Object.assign(u, apprFields(i), {partsSaved: true}); saveParts(prow, i.devId, "inc", i._id); }   // quản đốc tự sửa: tự duyệt
     put("incidents", i._id, u, true); F.incCache = Object.assign({}, i, u, {_fresh: Date.now()});
     delete S.incOpen[i._id]; if (u.appr) delete S.incPend[i._id]; else S.incPend[i._id] = F.incCache;
@@ -1476,8 +1480,8 @@ async function exp(k){
         .concat(L.map(x => [fmtDT(x.at), x.devId, x.devName, x.group, x.gauge, x.area, x.name, x.qty, x.src === "inc" ? T("Sửa máy hỏng") : T("Bảo trì định kỳ"), x.byName])));
     } else {
       const L = docs("incidents", await Q("incidents", "month", m).get()).sort((a, b) => a.at - b.at);
-      csvDown("su-co-" + m + ".csv", [[T("Ngày giờ báo"), T("Mã máy"), T("Tên máy"), T("Mô tả"), T("Người báo"), T("Tình trạng"), T("Hướng xử lý"), T("Khắc phục"), T("Xong lúc"), T("Thời gian sửa (phút)")]]
-        .concat(L.map(i => [fmtDT(i.at), i.devId, i.devName, i.desc, i.byName, T(ISTATUS[iSt(i)][0]), i.next, i.fix, fmtDT(i.fixAt), i.fixAt ? Math.round((i.fixAt - i.at) / 60000) : ""])));
+      csvDown("su-co-" + m + ".csv", [[T("Ngày giờ báo"), T("Mã máy"), T("Tên máy"), T("Mô tả"), T("Người báo"), T("Tình trạng"), T("Hướng xử lý"), T("Khắc phục"), T("Người sửa xong"), T("Xong lúc"), T("Thời gian sửa (phút)")]]
+        .concat(L.map(i => [fmtDT(i.at), i.devId, i.devName, i.desc, i.byName, T(ISTATUS[iSt(i)][0]), i.next, i.fix, i.fixBy || "", fmtDT(i.fixAt), i.fixAt ? Math.round((i.fixAt - i.at) / 60000) : ""])));
     }
   } catch(e){ onErr(e); } finally { busy(false); }
 }
@@ -1642,6 +1646,10 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Người sửa xong": "修理完了者",
+"Báo: {n}": "報告: {n}",
+"Sửa xong: {n}": "修理: {n}",
+"Máy do {n} báo. Bạn có thể ghi hướng xử lý hoặc sửa tiếp, tên bạn sẽ được lưu lại.": "{n}さんの報告です。対応内容の記入や修理の続きができます。あなたの名前が記録されます。",
 "không bắt buộc, tối đa 3 ảnh": "任意・最大3枚",
 "Nhập mô tả sự cố": "不具合の内容を入力してください",
 "Xoá dữ liệu theo thời gian": "期間指定でデータ削除",
