@@ -147,6 +147,27 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
 .prow{display:flex;gap:8px;margin-bottom:8px;align-items:center}.prow .pn{flex:1;min-width:0}.prow .pq{width:84px;flex:none;text-align:center}
 .btn.px{width:52px;min-height:52px;padding:0;flex:none;color:var(--r)}
+/* Máy đan */
+.fchips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.fc{border:1.5px solid var(--bd);background:#fff;border-radius:999px;min-height:42px;padding:0 14px;font-weight:700;font-size:15px;cursor:pointer;color:var(--tx)}
+.fc span{display:inline-block;min-width:22px;border-radius:11px;background:#eceeec;color:var(--mu);font-size:12px;padding:1px 6px;margin-left:4px}
+.fc.on{border-color:var(--g);background:var(--g);color:#fff}.fc.on span{background:rgba(255,255,255,.25);color:#fff}
+.fc.pc{font-family:ui-monospace,Menlo,Consolas,monospace}
+.knbar{border:1.5px solid #e6dc7a}
+@media (min-width:700px){.knbar{position:sticky;top:64px;z-index:5;box-shadow:0 4px 12px rgba(0,0,0,.08)}}
+.knt{flex:1 1 260px;min-width:0}
+@media (max-width:699px){
+  #knsave{position:fixed;left:12px;right:12px;width:auto;bottom:calc(74px + env(safe-area-inset-bottom));z-index:20;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+  main.v-knit{padding-bottom:170px}
+  .prodband small{display:none}
+}
+.stepn{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--g);color:#fff;font-size:13px;margin-right:8px}
+.prodband{background:var(--y);color:#2a2a00;padding:6px 12px;display:flex;align-items:baseline;gap:8px;min-height:38px}
+.prodband small{font-size:12px;font-weight:600;opacity:.75}
+.prodband b{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:18px;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.prodband.none{background:#eceeec;color:var(--mu)}.prodband.none b{font-family:inherit;font-size:15px}
+.gbadge{position:absolute;left:8px;bottom:8px;background:var(--g2);color:#fff;font-weight:800;font-size:13px;border-radius:8px;padding:2px 8px}
+.dt .pic{position:relative}
 /* Thiết bị dạng ô */
 .dgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 @media (min-width:700px){.dgrid{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -214,7 +235,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "22/10/2026 08:00";
+const VERSION = "22/10/2026 10:00";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -312,6 +333,7 @@ const ICONS = {
   out:"M10 4H5v16h5M15 8l4 4-4 4M19 12H9",
   down:"M12 4v12M7 11l5 5 5-5M5 20h14",
   chart:"M4 20V11M10 20V5M16 20v-6M21 20H3",
+  knit:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM4.5 8.5c4.5 1.3 10.5 1.3 15 0M3.2 13.5c5.5 1.6 12 1.6 17.6 0M9 3.6c-1.6 5.3-1.6 11.5 0 16.8M15 3.6c1.4 3.4 1.6 7.2.6 11",
   sliders:"M4 6h16M4 12h16M4 18h16M8 4v4M16 10v4M10 16v4",
   globe:"M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c2.5 2.5 3.5 5.5 3.5 9s-1 6.5-3.5 9M12 3C9.5 5.5 8.5 8.5 8.5 12s1 6.5 3.5 9",
   x:"M6 6l12 12M18 6L6 18",
@@ -334,6 +356,7 @@ const UNITS = {day:"ngày", week:"tuần", month:"tháng", year:"năm", once:"1 
 const DEF_CFG = {areas:["Xưởng Đan","Xưởng PVC","Xưởng Cao su","Xưởng May","Kho","Văn phòng"], kinds:["Vệ sinh","Tra dầu mỡ","Kiểm tra điện","Kiểm tra tổng quát","Thay thế linh kiện"],
   groups:["Máy đan","Máy in PVC","Máy nhúng cao su","Lò sấy / lò lưu hoá","Máy may","Máy nén khí","Nồi hơi","Xe nâng","Máy đóng gói","Khác"],
   depts:["Bảo trì","Đan","PVC","Cao su","May","Kho"],
+  products:[],
   parts:["Kim đan","Lưỡi gà","Lò xo kim","Dây curoa","Bạc đạn","Motor","Cảm biến","Rơ-le nhiệt","Phớt bơm","Kim may","Dao cắt","Lọc gió","Xích tải","Khuôn tay"]};
 const GAUGES = ["7G","8G","10G","13G","15G"];                       // loại máy đan
 const isKnit = g => String(g || "").trim().toLowerCase() === "máy đan";
@@ -351,7 +374,7 @@ const dChip = d => { const x = devState(d); return chip(x[0], x[1]); };
 
 /* ================== FIRESTORE ================== */
 /* Mọi dữ liệu nằm trong 1 collection; mỗi tài liệu có trường type và id dạng {tiền tố}_{khoá} */
-const TYPES = {accounts:"acc", devices:"dev", plans:"plan", logs:"log", incidents:"inc", photos:"photo", config:"config", parts:"part"};
+const TYPES = {accounts:"acc", devices:"dev", plans:"plan", logs:"log", incidents:"inc", photos:"photo", config:"config", parts:"part", prodlog:"prod"};
 let FS, COL;
 const R = (c, id) => COL.doc(TYPES[c] + "_" + id);
 function Q(c, f, v){ let q = COL.where("type", "==", TYPES[c]); if (f) q = q.where(f, "==", v); return q; }
@@ -434,8 +457,8 @@ function go(view, p, replace){
   render();
 }
 function back(){ ((history.state && history.state.d) || 0) > 0 ? history.back() : go("home", {}, true); }
-const NAV_W = [["home","home","Trang chủ"],["tasks","list","Việc"],["incidents","alert","Sự cố"],["me","user","Tôi"]];
-const NAV_M = [["home","home","Trang chủ"],["devices","box","Thiết bị"],["plans","cal","Kế hoạch"],["incidents","alert","Sự cố"],["report","chart","Báo cáo"]];
+const NAV_W = [["home","home","Trang chủ"],["knit","knit","Máy đan"],["tasks","list","Việc"],["incidents","alert","Sự cố"],["me","user","Tôi"]];
+const NAV_M = [["home","home","Trang chủ"],["knit","knit","Máy đan"],["devices","box","Thiết bị"],["plans","cal","Kế hoạch"],["incidents","alert","Sự cố"],["report","chart","Báo cáo"]];
 window.addEventListener("popstate", e => {
   if (SCAN.on){ closeScan(true); return; }
   if ($(".lb")){ $(".lb").remove(); return; }
@@ -593,6 +616,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
     '<dl class="info" style="margin-top:12px">' +
       (d.group ? '<dt>' + esc(T("Nhóm máy")) + '</dt><dd>' + esc(d.group) + '</dd>' : "") +
       (d.gauge ? '<dt>' + esc(T("Loại máy")) + '</dt><dd>' + esc(d.gauge) + '</dd>' : "") +
+      (isKnit(d.group) ? '<dt>' + esc(T("Mã hàng đang chạy")) + '</dt><dd>' + (d.product ? '<b>' + esc(d.product) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : '<span class="mu">' + esc(T("Chưa có mã hàng")) + '</span>') + '</dd>' : "") +
       (d.area ? '<dt>' + esc(T("Khu vực")) + '</dt><dd>' + esc(d.area) + '</dd>' : "") +
       ((d.maker || d.model) ? '<dt>' + esc(T("Hãng / Model")) + '</dt><dd>' + esc([d.maker, d.model].filter(Boolean).join(" / ")) + '</dd>' : "") +
       (d.since ? '<dt>' + esc(T("Ngày sử dụng")) + '</dt><dd>' + esc(fmtD(d.since)) + '</dd>' : "") +
@@ -603,6 +627,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
   if (incs.length) h += '<h3>' + esc(T("Sự cố chưa xong")) + '</h3>' + incs.map(incItem).join("");
   h += '<h3>' + esc(T("Kế hoạch bảo trì")) + '</h3>' + (plans.length ? plans.map(p => planItem(p)).join("") : empty("cal", T("Chưa có kế hoạch")));
   if (isMgr()) h += '<button class="btn gh" onclick="go(\'planform\',{dev:\'' + c + '\'})">' + ic("plus") + T("Thêm kế hoạch cho máy này") + '</button>';
+  if (isKnit(d.group)) h += '<h3>' + esc(T("Lịch sử mã hàng")) + '</h3><div id="prodhist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
   h += '<h3>' + esc(T("Linh kiện đã thay")) + '</h3><div id="phist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
   h += '<h3>' + esc(T("Lịch sử gần đây")) + '</h3><div id="hist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
   return h;
@@ -610,7 +635,8 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
   const c = V.p.code; if (!S.dev[c]) return;
   qrSvg(qrText(c)).then(s => { const e = $("#devqr"); if (e) e.innerHTML = s; }).catch(() => {});
   if (F.histFor === c && F.hist){ drawHist(); return; }
-  Promise.all([Q("logs", "devId", c).get(), Q("incidents", "devId", c).get(), Q("parts", "devId", c).get()]).then(([a, b, p]) => {
+  Promise.all([Q("logs", "devId", c).get(), Q("incidents", "devId", c).get(), Q("parts", "devId", c).get(), isKnit(S.dev[c].group) ? Q("prodlog", "devId", c).get() : null]).then(([a, b, p, pl]) => {
+    F.prodh = pl ? docs("prodlog", pl).sort((x, y) => y.at - x.at) : [];
     F.histFor = c;
     F.hist = docs("logs", a).map(x => Object.assign(x, {_k: "log"})).concat(docs("incidents", b).map(x => Object.assign(x, {_k: "inc"}))).sort((x, y) => y.at - x.at).slice(0, 15);
     F.phist = docs("parts", p).sort((x, y) => y.at - x.at);
@@ -618,6 +644,10 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
   }).catch(e => { ["#hist", "#phist"].forEach(id => { const el = $(id); if (el) el.innerHTML = empty("clock", T("Không tải được lịch sử")); }); });
 }};
 function drawHist(){
+  const ph = $("#prodhist");
+  if (ph) ph.innerHTML = (F.prodh || []).length ? '<div class="card" style="padding:4px 14px">' + F.prodh.slice(0, 10).map(x => '<div class="nl"><div class="row"><span class="f"><b>' + esc(x.product || T("(Không chạy hàng)")) + '</b>' +
+      (x.from ? ' <span class="sm mu">← ' + esc(x.from) + '</span>' : "") + '</span><span class="sm mu">' + esc(fmtDT(x.at)) + '</span></div><div class="sm mu">' + esc(x.byName || "") + '</div></div>').join("") + '</div>'
+    : empty("knit", T("Chưa có lịch sử mã hàng"));
   // linh kiện đã thay của máy: tổng theo loại + các lần thay gần nhất
   const pe = $("#phist"), P = F.phist || [];
   if (pe){
@@ -931,6 +961,100 @@ function saveIncUpd(){
 }
 
 /* ---- Thiết bị (quản lý) ---- */
+/* ---- Máy đan: xem mã hàng đang chạy, quản đốc chọn nhiều máy để đổi mã hàng ---- */
+const knitDevs = () => Object.values(S.dev).filter(d => isKnit(d.group) && d.status !== "off").sort((a, b) => a._id < b._id ? -1 : 1);
+const canSetProd = () => S.user.role === "manager";
+VIEWS.knit = {wide: true, live: true, title: () => T("Máy đan"), html(){
+  if (!F.kn) F = {kn: 1, sel: {}, mode: false, g: "", p: null};
+  const all = knitDevs();
+  if (!all.length) return empty("knit", S.loaded.dev ? T("Chưa có máy nào thuộc nhóm Máy đan.") : "…");
+  let h = "";
+  if (canSetProd()) h += F.mode ? '<div class="hl knbar" id="knpanel">' + knPanel() + '</div>'
+    : '<button class="btn" style="margin-bottom:12px" onclick="F.mode=true;F.prod=\'\';render(true)">' + ic("plus") + T("Thêm mã hàng") + '</button>';
+  // lọc theo loại máy (7G–15G)
+  const gs = GAUGES.filter(g => all.some(d => d.gauge === g));
+  h += '<div class="fchips" id="kngauge">' + [["", T("Tất cả")]].concat(gs.map(g => [g, g])).map(([g, l]) => '<button class="fc' + (F.g === g ? " on" : "") + '" onclick="F.g=\'' + g + '\';drawKnit()">' + esc(l) + ' <span>' + all.filter(d => !g || d.gauge === g).length + '</span></button>').join("") + '</div>';
+  h += '<div id="knsum"></div><div id="knlist"></div>';
+  return h;
+}, after(){ drawKnit(); }};
+function knFiltered(){ return knitDevs().filter(d => (!F.g || d.gauge === F.g) && (F.p === null || (d.product || "") === F.p)); }
+function drawKnit(){
+  const el = $("#knlist"); if (!el) return;
+  document.querySelectorAll("#kngauge .fc").forEach(b => b.classList.toggle("on", b.getAttribute("onclick").indexOf("F.g='" + F.g + "'") >= 0));
+  // tóm tắt theo mã hàng (bấm để lọc)
+  const base = knitDevs().filter(d => !F.g || d.gauge === F.g), cnt = {};
+  base.forEach(d => { const k = d.product || ""; cnt[k] = (cnt[k] || 0) + 1; });
+  $("#knsum").innerHTML = '<div class="mu sm" style="margin:2px 2px 6px">' + esc(T("Mã hàng đang chạy")) + ':</div><div class="fchips">' +
+    Object.entries(cnt).sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || b[1] - a[1]).map(([p, n]) => '<button class="fc pc' + (F.p === p ? " on" : "") + '" onclick="F.p=F.p===\'' + esc(p) + '\'?null:\'' + esc(p) + '\';drawKnit()">' + esc(p || T("Chưa có mã hàng")) + ' <span>' + n + '</span></button>').join("") + '</div>';
+  const L = knFiltered();
+  el.innerHTML = L.length ? '<div class="dgrid">' + L.map(knitTile).join("") + '</div>' : empty("knit", T("Không có máy phù hợp"));
+  const n = $("#knN"); if (n) n.textContent = Object.keys(F.sel).filter(k => F.sel[k]).length;
+  const t = $("#knsavet"); if (t) t.textContent = knSaveLabel();
+}
+function knitTile(d){
+  const s = devState(d), k = s[2], on = F.mode && F.sel[d._id];
+  return '<div class="dt kt ' + k + (on ? " picked" : "") + '" onclick="' + (F.mode ? "F.sel['" + d._id + "']=!F.sel['" + d._id + "'];drawKnit()" : "go('device',{code:'" + d._id + "'})") + '">' +
+    (F.mode ? '<span class="sel ' + (on ? "on" : "") + '">' + ic("ok") + '</span>' : "") +
+    '<span class="dst">' + chip(s[0], s[1]) + '</span>' +
+    '<div class="pic"><i class="mimg"></i>' + (d.gauge ? '<span class="gbadge">' + esc(d.gauge) + '</span>' : "") + '</div>' +
+    '<div class="prodband' + (d.product ? "" : " none") + '"><small>' + esc(T("Mã hàng")) + '</small><b>' + esc(d.product || T("Chưa có")) + '</b></div>' +
+    '<div class="dtb"><div class="code dcd">' + esc(d._id) + '</div><div class="dnm">' + esc(d.name || "") + '</div>' +
+    '<div class="dmeta">' + esc(d.product && d.productSince ? T("từ {t}", {t: fmtDT(d.productSince)}) : (d.area || "")) + '</div></div></div>';
+}
+/* Bảng thêm mã hàng: bước 1 chọn máy (chạm vào ô), bước 2 chọn mã hàng, rồi lưu */
+function knPanel(){
+  const n = Object.keys(F.sel).filter(k => F.sel[k]).length, P = S.cfg.products || [];
+  return '<div class="row" style="flex-wrap:wrap;gap:8px"><div class="b knt"><span class="stepn">1</span>' + esc(T("Chạm vào các máy cần thêm mã hàng")) + ' — ' + esc(T("Đã chọn")) + ' <span id="knN">' + n + '</span> ' + esc(T("máy")) + '</div>' +
+      '<button class="btn sm gh" onclick="knSelAll()">' + esc(T("Chọn tất cả đang hiện")) + '</button><button class="btn sm w" onclick="F.mode=false;F.sel={};render(true)">' + esc(T("Huỷ")) + '</button></div>' +
+    '<div class="b" style="margin:12px 0 6px"><span class="stepn">2</span>' + esc(T("Chọn mã hàng")) + '</div>' +
+    (P.length ? '<div class="fchips">' + P.map((p, i) => '<button class="fc pc' + (F.prod === p ? " on" : "") + '" onclick="F.prod=S.cfg.products[' + i + '];knPick()">' + esc(p) + '</button>').join("") + '</div>' : "") +
+    '<div class="row"><input id="kprod" class="code f" style="text-transform:uppercase" autocapitalize="characters" placeholder="' + esc(T("Hoặc gõ mã hàng mới")) + '" value="' + esc(P.indexOf(F.prod) >= 0 ? "" : (F.prod || "")) + '" oninput="F.prod=this.value.trim().toUpperCase();knPick(true)"></div>' +
+    '<button class="btn" id="knsave" style="margin-top:10px" onclick="saveProd(false, knSelected())">' + ic("ok") + '<span id="knsavet">' + esc(knSaveLabel()) + '</span></button>' +
+    '<button class="btn sm w" style="margin-top:8px;width:100%" onclick="if(knSelected().length && confirm(T(\'Bỏ mã hàng của các máy này (máy không chạy hàng)?\')))saveProd(true, knSelected())">' + T("Máy không chạy hàng") + '</button>';
+}
+const knSelected = () => Object.keys(F.sel).filter(k => F.sel[k] && S.dev[k]);
+const knSaveLabel = () => F.prod ? T("LƯU MÃ {p} CHO {n} MÁY", {p: F.prod, n: knSelected().length}) : T("LƯU MÃ HÀNG");
+function knPick(typed){
+  if (!typed){ const i = $("#kprod"); if (i) i.value = ""; }
+  document.querySelectorAll("#knpanel .fc").forEach(b => b.classList.toggle("on", b.textContent === F.prod));
+  const t = $("#knsavet"); if (t) t.textContent = knSaveLabel();
+}
+function knSelAll(){ const L = knFiltered(), all = L.every(d => F.sel[d._id]); L.forEach(d => F.sel[d._id] = !all); drawKnit(); }
+function knGo(){ const codes = Object.keys(F.sel).filter(k => F.sel[k] && S.dev[k]); if (!codes.length){ toast(T("Chưa chọn máy nào"), "err"); return; } go("knitset", {codes}); }
+VIEWS.knitset = {title: () => T("Cập nhật mã hàng"), html(){
+  if (!canSetProd()) return empty("knit", T("Chỉ quản đốc cập nhật mã hàng."));
+  const codes = (V.p.codes || []).filter(c => S.dev[c]);
+  if (F.ks !== codes.join()){ F.ks = codes.join(); F.prod = ""; }
+  let h = '<div class="card"><div class="b" style="margin-bottom:8px">' + esc(T("{n} máy được chọn", {n: codes.length})) + '</div><div class="row" style="flex-wrap:wrap;gap:6px">' +
+    codes.map(c => { const d = S.dev[c]; return '<span class="chip m">' + esc(c) + (d.gauge ? " · " + esc(d.gauge) : "") + (d.product ? " · " + esc(d.product) : "") + '</span>'; }).join("") + '</div></div>';
+  const gs = Array.from(new Set(codes.map(c => S.dev[c].gauge).filter(Boolean)));
+  if (gs.length > 1) h += '<div class="hl">' + esc(T("Lưu ý: các máy được chọn khác loại ({g}).", {g: gs.join(", ")})) + '</div>';
+  h += '<div class="lc"><label class="req">' + esc(T("Mã hàng mới")) + '</label><input id="kprod" class="code" style="text-transform:uppercase" list="dl_prod" autocapitalize="characters" value="' + esc(F.prod) + '" oninput="F.prod=this.value" placeholder="' + esc(T("Chọn hoặc gõ mã hàng")) + '">' +
+    '<datalist id="dl_prod">' + (S.cfg.products || []).map(p => '<option value="' + esc(p) + '">').join("") + '</datalist>' +
+    '<div class="mu sm" style="margin-top:4px">' + esc(T("Mã hàng mới gõ lần đầu sẽ tự thêm vào danh mục.")) + '</div></div>';
+  if ((S.cfg.products || []).length) h += '<div class="fchips" style="margin-bottom:12px">' + S.cfg.products.slice(0, 24).map(p => '<button class="fc" onclick="F.prod=\'' + esc(p) + '\';document.getElementById(\'kprod\').value=F.prod">' + esc(p) + '</button>').join("") + '</div>';
+  h += '<button class="btn" onclick="saveProd()">' + ic("ok") + T("LƯU MÃ HÀNG") + '</button>' +
+    '<button class="btn w" style="margin-top:10px" onclick="if(confirm(T(\'Bỏ mã hàng của các máy này (máy không chạy hàng)?\')))saveProd(true)">' + T("Máy không chạy hàng") + '</button>';
+  return h;
+}};
+function saveProd(clear, list){
+  if (!canSetProd()) return;
+  const codes = (list || V.p.codes || []).filter(c => S.dev[c]), p = clear ? "" : String(F.prod || "").trim().toUpperCase();
+  if (!codes.length){ toast(T("Chưa chọn máy nào"), "err"); return; }
+  if (!clear && !p){ toast(T("Chọn hoặc gõ mã hàng"), "err"); return; }
+  const now = Date.now(), t = today();
+  codes.forEach(c => {
+    const d = S.dev[c]; if ((d.product || "") === p) return;
+    put("devices", c, {product: p, productSince: now, productBy: S.user.name}, true);
+    put("prodlog", uid(), {devId: c, devName: d.name || "", gauge: d.gauge || "", product: p, from: d.product || "", by: S.user.id, byName: S.user.name, at: now, date: t, month: ym(t)});
+    S.dev[c] = Object.assign({}, d, {product: p, productSince: now});
+  });
+  if (p && (S.cfg.products || []).indexOf(p) < 0) put("config", "main", {products: (S.cfg.products || []).concat([p])}, true);   // mã mới: thêm vào danh mục
+  F = {kn: 1, sel: {}, mode: false, g: "", p: null}; F.histFor = "";
+  toast(T("Đã cập nhật mã hàng cho {n} máy", {n: codes.length}), "ok"); vib();
+  if (V.view === "knit") render(true); else back();
+}
+
 VIEWS.devices = {wide: true, live: true, mgr: true, title: () => T("Thiết bị"), html(){
   if (!F.dv){ F = {dv: 1, q: "", area: "", st: "", selMode: false, sel: {}}; }
   const L = filteredDevs();
@@ -1274,6 +1398,7 @@ VIEWS.settings = {mgr: true, title: () => T("Cài đặt danh mục"), html(){
   return '<div class="lc"><label>' + esc(T("Bộ phận (mỗi dòng 1 mục)")) + '</label><textarea id="sdepts" rows="5">' + esc((S.cfg.depts || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Nhóm máy (mỗi dòng 1 mục)")) + '</label><textarea id="sgroups" rows="6">' + esc((S.cfg.groups || []).join("\n")) + '</textarea>' +
       '<div class="mu sm" style="margin-top:4px">' + esc(T("Nhóm \"Máy đan\" sẽ có thêm ô Loại máy: 7G, 8G, 10G, 13G, 15G.")) + '</div></div>' +
+    '<div class="lc"><label>' + esc(T("Mã hàng máy đan (mỗi dòng 1 mục)")) + '</label><textarea id="sprods" rows="6">' + esc((S.cfg.products || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Danh mục linh kiện (mỗi dòng 1 mục)")) + '</label><textarea id="sparts" rows="6">' + esc((S.cfg.parts || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Khu vực / xưởng (mỗi dòng 1 mục)")) + '</label><textarea id="sareas" rows="6">' + esc((S.cfg.areas || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Hạng mục bảo trì thường dùng (mỗi dòng 1 mục)")) + '</label><textarea id="skinds" rows="6">' + esc((S.cfg.kinds || []).join("\n")) + '</textarea></div>' +
@@ -1281,7 +1406,7 @@ VIEWS.settings = {mgr: true, title: () => T("Cài đặt danh mục"), html(){
 }};
 function saveCfg(){
   const sp = id => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
-  put("config", "main", {depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), kinds: sp("#skinds")}, true); savedMsg(); back();
+  put("config", "main", {products: sp("#sprods").map(x => x.toUpperCase()), depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), kinds: sp("#skinds")}, true); savedMsg(); back();
 }
 /* ---- Xuất CSV ---- */
 VIEWS.export = {mgr: true, title: () => T("Xuất dữ liệu"), html(){
@@ -1299,8 +1424,8 @@ function csvDown(name, rows){
 }
 async function exp(k){
   const m = $("#xm").value || ym();
-  if (k === "dev") return csvDown("thiet-bi.csv", [[T("Mã"), T("Nhóm máy"), T("Loại máy"), T("Tên"), T("Khu vực"), T("Hãng"), T("Model"), T("Ngày sử dụng"), T("Trạng thái"), T("Ghi chú")]]
-    .concat(Object.values(S.dev).sort((a, b) => a._id < b._id ? -1 : 1).map(d => [d._id, d.group, d.gauge, d.name, d.area, d.maker, d.model, d.since, T(devState(d)[0]), d.note])));
+  if (k === "dev") return csvDown("thiet-bi.csv", [[T("Mã"), T("Nhóm máy"), T("Loại máy"), T("Mã hàng đang chạy"), T("Tên"), T("Khu vực"), T("Hãng"), T("Model"), T("Ngày sử dụng"), T("Trạng thái"), T("Ghi chú")]]
+    .concat(Object.values(S.dev).sort((a, b) => a._id < b._id ? -1 : 1).map(d => [d._id, d.group, d.gauge, d.product || "", d.name, d.area, d.maker, d.model, d.since, T(devState(d)[0]), d.note])));
   if (k === "plan") return csvDown("ke-hoach.csv", [[T("Mã máy"), T("Tên máy"), T("Hạng mục"), T("Chu kỳ"), T("Hạn tiếp theo"), T("Người phụ trách"), T("Lần làm gần nhất")]]
     .concat(planList().map(p => [p.devId, devName(p.devId), p.task, cycleText(p), p.nextDue, p.assignee ? ((S.acc[p.assignee] || {}).name || p.assignee) : T("Tất cả công nhân"), p.lastDone || ""])));
   busy(true);
@@ -1481,6 +1606,45 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Thêm mã hàng": "品番を追加",
+"Chạm vào các máy cần thêm mã hàng": "品番を設定する設備をタップ",
+"Chọn mã hàng": "品番を選択",
+"Hoặc gõ mã hàng mới": "または新しい品番を入力",
+"LƯU MÃ {p} CHO {n} MÁY": "{n} 台に {p} を保存",
+"Chọn hoặc gõ mã hàng": "品番を選択または入力してください",
+
+"Máy đan": "編み機",
+"Mã hàng đang chạy": "現在の品番",
+"từ {t}": "{t} から",
+"Chưa có mã hàng": "品番未設定",
+"Lịch sử mã hàng": "品番の履歴",
+"(Không chạy hàng)": "（生産なし）",
+"Chưa có lịch sử mã hàng": "品番の履歴はありません",
+"Chưa có máy nào thuộc nhóm Máy đan.": "編み機グループの設備がありません。",
+"Đã chọn": "選択中",
+"máy": "台",
+"Chọn tất cả đang hiện": "表示中をすべて選択",
+"Huỷ": "キャンセル",
+"CẬP NHẬT MÃ HÀNG": "品番を更新",
+"Chọn máy để cập nhật mã hàng": "品番を更新する設備を選択",
+"Không có máy phù hợp": "該当する設備がありません",
+"Mã hàng": "品番",
+"Chưa có": "未設定",
+"Chưa chọn máy nào": "設備が選択されていません",
+"Cập nhật mã hàng": "品番の更新",
+"Chỉ quản đốc cập nhật mã hàng.": "品番の更新は職長のみ可能です。",
+"{n} máy được chọn": "{n} 台を選択",
+"Lưu ý: các máy được chọn khác loại ({g}).": "注意：選択した設備の機種が異なります（{g}）。",
+"Mã hàng mới": "新しい品番",
+"Chọn hoặc gõ mã hàng": "品番を選択または入力",
+"Mã hàng mới gõ lần đầu sẽ tự thêm vào danh mục.": "新しく入力した品番はマスタに自動で追加されます。",
+"LƯU MÃ HÀNG": "品番を保存",
+"Bỏ mã hàng của các máy này (máy không chạy hàng)?": "これらの設備の品番を外しますか（生産なし）？",
+"Máy không chạy hàng": "生産なしにする",
+"Nhập mã hàng": "品番を入力してください",
+"Đã cập nhật mã hàng cho {n} máy": "{n} 台の品番を更新しました",
+"Mã hàng máy đan (mỗi dòng 1 mục)": "編み機の品番（1行に1項目）",
+
 "Quản trị chỉ theo dõi, không ghi kết quả bảo trì.": "管理者は閲覧のみで、保全結果は記録できません。",
 "Quản trị chỉ theo dõi, không báo sự cố.": "管理者は閲覧のみで、異常報告はできません。",
 "{n} báo cáo của bạn chưa sửa xong": "未修理のあなたの報告 {n} 件",
