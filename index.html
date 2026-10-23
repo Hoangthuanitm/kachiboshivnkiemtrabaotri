@@ -275,7 +275,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "23/10/2026 13:00";
+const VERSION = "23/10/2026 13:10";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -1576,8 +1576,19 @@ VIEWS.accform = {mgr: true, title: () => V.p.id ? T("Sửa tài khoản") : T("T
   h += '<div class="lc"><label class="' + (e ? "" : "req") + '">' + esc(e ? T("Mã PIN mới (để trống nếu không đổi)") : T("Mã PIN (4–8 số)")) + '</label><input id="apin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="new-password"></div>';
   if (e && V.p.id !== S.user.id) h += '<div class="ck ' + (F.active ? "on" : "") + '" onclick="F.active=!F.active;this.classList.toggle(\'on\',F.active)"><span class="bx">' + ic("ok") + '</span><span>' + esc(T("Đang hoạt động (bỏ chọn để khoá)")) + '</span></div>';
   h += '<button class="btn" style="margin-top:10px" onclick="saveAcc()">' + ic("ok") + T("LƯU TÀI KHOẢN") + '</button>';
+  if (e && isAdmin() && V.p.id !== S.user.id) h += '<button class="btn w" style="margin-top:10px;color:var(--r);border-color:#f0b9b9" onclick="delAcc()">' + ic("trash") + T("Xoá tài khoản này") + '</button>';
   return h;
 }};
+/* Quản trị xoá tài khoản (không xoá được chính mình). Báo cáo cũ vẫn giữ tên người làm. */
+async function delAcc(){
+  const id = V.p.id, a = S.acc[id];
+  if (!isAdmin() || !a || id === S.user.id) return;
+  if (!confirm(T("Xoá vĩnh viễn tài khoản {n} ({c})? Báo cáo cũ vẫn giữ tên người này.", {n: a.name, c: id}))) return;
+  busy(true);
+  try { await withTimeout(R("accounts", id).delete(), 15000); delete S.acc[id]; toast(T("Đã xoá tài khoản"), "ok"); back(); }
+  catch(e){ if (e && e.code === "permission-denied") toast(T("Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules."), "err"); else onErr(e); }
+  finally { busy(false); }
+}
 async function saveAcc(){
   const e = V.p.id ? S.acc[V.p.id] : null;
   const id = e ? V.p.id : ($("#aid").value || "").trim().toUpperCase();
@@ -1854,6 +1865,9 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Xoá tài khoản này": "このアカウントを削除",
+"Xoá vĩnh viễn tài khoản {n} ({c})? Báo cáo cũ vẫn giữ tên người này.": "アカウント {n}（{c}）を完全に削除しますか？過去の報告の名前は残ります。",
+"Đã xoá tài khoản": "アカウントを削除しました",
 "Xoá toàn bộ dữ liệu": "全データ削除",
 "Xoá sạch toàn bộ dữ liệu của app, không khôi phục được. Nên xuất Excel trước khi xoá.": "アプリの全データを削除します。元に戻せません。削除前にExcel出力をおすすめします。",
 "Sẽ xoá": "削除対象",
