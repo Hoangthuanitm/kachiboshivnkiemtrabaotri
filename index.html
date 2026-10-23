@@ -192,6 +192,7 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .atbl .tact{text-align:right;white-space:nowrap}.atbl .tact .btn.sm{height:36px;padding:0 12px}
 .cnone{color:var(--mu);font-size:14px;padding:10px 4px 12px}
 @media (min-width:1000px){.crow .cc{display:flex;align-items:baseline;gap:14px}.crow .c1{flex:1 1 auto;min-width:0}.crow .c2{flex:0 1 auto;max-width:48%}}
+.accx{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid #f0b9b9;background:#fff;color:var(--r);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:2px}.accx:active{background:var(--rl)}.accx svg.i{width:20px;height:20px;stroke-width:2.6}
 .actbox{border:2px solid var(--g);border-radius:14px;padding:12px 14px 2px;margin:6px 0 12px;background:#f3faf5}
 @media (min-width:700px){.knbar{position:sticky;top:64px;z-index:5;box-shadow:0 4px 12px rgba(0,0,0,.08)}}
 .knt{flex:1 1 140px;min-width:0;font-size:17px}
@@ -275,7 +276,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "23/10/2026 13:10";
+const VERSION = "23/10/2026 13:20";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -1555,7 +1556,8 @@ VIEWS.accounts = {wide: true, live: true, mgr: true, title: () => T("Tài khoả
   return '<button class="btn" style="margin-bottom:12px" onclick="go(\'accform\')">' + ic("plus") + T("Thêm tài khoản") + '</button>' +
     (isAdmin() ? "" : '<div class="hl">' + esc(T("Quản đốc tạo và sửa được tài khoản Tổ trưởng, Công nhân, iPad máy.")) + '</div>') +
     lst(L.map(a => '<div class="it ' + (a.active === false ? "m" : "") + '" onclick="go(\'accform\',{id:\'' + esc(a._id) + '\'})"><div class="f"><div class="t1">' + esc(a.name) + '</div><div class="t2"><span class="code">' + esc(a._id) + '</span>' + ((a.dept || a.area) ? " · " + esc(a.dept || a.area) : "") + '</div></div>' +
-      (a.active === false ? chip("Đã khoá", "m") : chip(ROLES[a.role] || a.role, a.role === "worker" ? "g" : a.role === "leader" ? "o" : a.role === "device" ? "m" : "a")) + '</div>').join(""));
+      (a.active === false ? chip("Đã khoá", "m") : chip(ROLES[a.role] || a.role, a.role === "worker" ? "g" : a.role === "leader" ? "o" : a.role === "device" ? "m" : "a")) +
+      (isAdmin() && a._id !== S.user.id ? '<button class="accx" title="' + esc(T("Xoá tài khoản này")) + '" onclick="event.stopPropagation();delAcc(\'' + esc(a._id) + '\')">' + ic("x") + '</button>' : "") + '</div>').join(""));
 }};
 VIEWS.accform = {mgr: true, title: () => V.p.id ? T("Sửa tài khoản") : T("Thêm tài khoản"), html(){
   const e = V.p.id ? S.acc[V.p.id] : null;
@@ -1580,12 +1582,12 @@ VIEWS.accform = {mgr: true, title: () => V.p.id ? T("Sửa tài khoản") : T("T
   return h;
 }};
 /* Quản trị xoá tài khoản (không xoá được chính mình). Báo cáo cũ vẫn giữ tên người làm. */
-async function delAcc(){
-  const id = V.p.id, a = S.acc[id];
+async function delAcc(aid){
+  const id = aid || V.p.id, a = S.acc[id];
   if (!isAdmin() || !a || id === S.user.id) return;
   if (!confirm(T("Xoá vĩnh viễn tài khoản {n} ({c})? Báo cáo cũ vẫn giữ tên người này.", {n: a.name, c: id}))) return;
   busy(true);
-  try { await withTimeout(R("accounts", id).delete(), 15000); delete S.acc[id]; toast(T("Đã xoá tài khoản"), "ok"); back(); }
+  try { await withTimeout(R("accounts", id).delete(), 15000); delete S.acc[id]; toast(T("Đã xoá tài khoản"), "ok"); if (aid) render(true); else back(); }
   catch(e){ if (e && e.code === "permission-denied") toast(T("Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules."), "err"); else onErr(e); }
   finally { busy(false); }
 }
