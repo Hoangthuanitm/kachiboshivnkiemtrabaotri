@@ -184,8 +184,8 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .dt.broken .mimg{filter:hue-rotate(205deg) saturate(1.6) brightness(1.05)}
 .dt.off .mimg{filter:grayscale(1) brightness(1.1)}
 .dt .dst{position:absolute;top:8px;right:8px;z-index:1}.dt .dst .chip{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.08)}
-.dt .sel{position:absolute;top:8px;left:8px;background:#fff}
-.dt.picked{border-color:var(--g);box-shadow:0 0 0 2px var(--g)}
+.dt .sel{position:absolute;top:8px;left:8px;background:#fff;z-index:2}.dt .sel.on{background:var(--g)}
+.dt.picked{border-color:var(--g);box-shadow:0 0 0 2px var(--g)}.dt.picked .dtb{background:#e8f4ec}
 .dtb{padding:10px 12px 12px}
 .dcd{font-size:17px}
 .dnm{font-weight:600;font-size:15px;margin-top:2px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -237,7 +237,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "23/10/2026 08:30";
+const VERSION = "23/10/2026 10:30";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -416,7 +416,7 @@ const me = () => ACT || S.user;
 const people = () => Object.values(S.acc).filter(a => a.active !== false && ["worker", "leader", "manager"].indexOf(a.role) >= 0).sort((a, b) => a.name < b.name ? -1 : 1);
 function actorBox(label, defId){
   if (!isDevice()) return "";
-  const L = people(), cur = F.actId || defId || lsGet("kb_actor") || "", by = {};
+  const L = people(), cur = F.actId || defId || "", by = {};   // không tự chọn người lần trước: mỗi người tự chọn tên mình
   L.forEach(a => { const k = a.dept || a.area || T("Khác"); (by[k] = by[k] || []).push(a); });
   return '<div class="actbox"><div class="b" style="margin-bottom:8px">' + ic("user") + ' ' + esc(T("Xác nhận người làm")) + '</div><div class="grid2">' +
     '<div class="lc"><label class="req">' + esc(T(label || "Người phụ trách")) + '</label><select id="actId" onchange="F.actId=this.value;F.actPin=\'\';var p=document.getElementById(\'actPin\');if(p){p.value=\'\';p.focus()}"><option value="">' + esc(T("— Chọn tên —")) + '</option>' +
@@ -429,10 +429,10 @@ async function getActor(){
   if (!id || !a){ toast(T("Chọn tên người phụ trách"), "err"); const x = $("#actId"); if (x) x.scrollIntoView({block: "center"}); return null; }
   if (a.active === false){ toast(T("Tài khoản đã bị khoá"), "err"); return null; }
   if (!/^\d{4,8}$/.test(pin) || await sha256(a.salt + ":" + pin) !== a.hash){ toast(T("Sai mã PIN"), "err"); F.actPin = ""; const x = $("#actPin"); if (x){ x.value = ""; x.focus(); } return null; }
-  lsSet("kb_actor", id); F.actPin = "";
+  F.actPin = "";
   return {id, name: a.name, role: a.role};
 }
-async function asActor(fn){ const a = await getActor(); if (!a) return; ACT = a; try { await fn(); } finally { ACT = null; } }
+async function asActor(fn){ const a = await getActor(); if (!a) return; ACT = a; try { await fn(); } finally { ACT = null; F.actId = ""; F.actPin = ""; const x = $("#actPin"); if (x) x.value = ""; } }
 
 function startLive(){
   stopLive();
@@ -1248,7 +1248,7 @@ VIEWS.plans = {wide: true, live: true, mgr: true, title: () => T("Kế hoạch b
   h += '<div class="tabs">' + tb("all", "Tất cả") + tb("over", "Trễ hạn") + tb("week", "Tuần này") + '</div>';
   const L = fl[F.pf];
   h += L.length ? lst(L.map(p => '<div class="it ' + (p.nextDue < t ? "r" : p.nextDue === t ? "a" : "") + '" onclick="go(\'planform\',{id:\'' + p._id + '\'})"><div class="f"><div class="t1">' + esc(p.task) + '</div>' +
-    '<div class="t2"><span class="code">' + esc(p.devId) + '</span> · ' + esc(cycleText(p)) + ' · ' + esc(p.assignee ? ((S.acc[p.assignee] || {}).name || p.assignee) : T("Tất cả công nhân")) + '</div></div>' + dueChip(p) + '</div>').join(""))
+    '<div class="t2"><span class="code">' + esc(p.devId) + '</span> · ' + esc(cycleText(p)) + '</div></div>' + dueChip(p) + '</div>').join(""))
     : empty("cal", T("Chưa có kế hoạch"));
   return h;
 }};
@@ -1264,16 +1264,16 @@ VIEWS.planform = {mgr: true, title: () => V.p.id ? T("Sửa kế hoạch") : T("
   h += '<div class="grid2"><div class="lc"><label>' + esc(T("Chu kỳ")) + '</label><select id="punit" onchange="document.getElementById(\'pev\').style.display=this.value===\'once\'?\'none\':\'\'">' + Object.entries(UNITS).map(([k, v]) => '<option value="' + k + '"' + (p.unit === k ? " selected" : "") + '>' + esc(k === "once" ? T("1 lần") : T("Theo {u}", {u: T(v)})) + '</option>').join("") + '</select></div>' +
     '<div class="lc" id="pev"' + (p.unit === "once" ? ' style="display:none"' : "") + '><label>' + esc(T("Mỗi bao nhiêu")) + '</label><input id="pevery" type="number" min="1" inputmode="numeric" value="' + esc(p.every || 1) + '"></div></div>';
   h += '<div class="lc"><label class="req">' + esc(e ? T("Hạn tiếp theo") : T("Ngày bắt đầu (hạn đầu tiên)")) + '</label><input id="pdue" type="date" value="' + esc(p.nextDue) + '"></div>';
-  h += '<div class="lc"><label>' + esc(T("Người phụ trách")) + '</label><select id="pwho"><option value="">' + esc(T("Tất cả công nhân")) + '</option>' + workers.map(w => '<option value="' + esc(w._id) + '"' + (p.assignee === w._id ? " selected" : "") + '>' + esc(w.name) + '</option>').join("") + '</select></div>';
   h += '<div class="lc"><label>' + esc(T("Ghi chú / lưu ý an toàn")) + '</label><textarea id="pnote">' + esc(p.note || "") + '</textarea></div>';
   if (e && e.lastDone) h += '<div class="mu sm" style="margin-bottom:10px">' + esc(T("Lần làm gần nhất: {d} – {n}", {d: fmtD(e.lastDone), n: e.lastBy || ""})) + '</div>';
   if (!e){   // thêm mới: chạm vào ô để chọn nhiều máy một lần
     const gs = Array.from(new Set(pfDevs("").map(d => d.group).filter(Boolean)));
-    h += '<div class="hl knbar"><div class="row" style="flex-wrap:wrap;gap:8px"><div class="b knt">' + esc(T("Chọn máy")) + ' <span class="kncount"><span id="pfN">0</span> ' + esc(T("máy")) + '</span></div>' +
+    let pk = '<div class="hl knbar"><div class="row" style="flex-wrap:wrap;gap:8px"><div class="b knt">' + esc(T("Chọn máy")) + ' <span class="kncount"><span id="pfN">0</span> ' + esc(T("máy")) + '</span></div>' +
       '<button class="btn sm gh" onclick="pfAll()">' + esc(T("Chọn tất cả")) + '</button><button class="btn sm w" onclick="F.sel={};drawPf()">' + esc(T("Bỏ chọn")) + '</button></div>' +
       '<div class="search lc" style="margin:10px 0 6px">' + ic("search") + '<input placeholder="' + esc(T("Tìm mã hoặc tên máy")) + '" value="' + esc(F.pq) + '" oninput="F.pq=this.value;drawPf()"></div>' +
       '<div class="fchips" id="pfgrp" style="margin:0">' + [["", T("Tất cả")]].concat(gs.map(g => [g, g])).map(([g, l]) => '<button class="fc' + (F.pg === g ? " on" : "") + '" data-g="' + esc(g) + '" onclick="F.pg=this.dataset.g;drawPf()">' + esc(l) + ' <span>' + pfDevs(g).length + '</span></button>').join("") + '</div></div>';
-    h += '<div id="pfgrid" style="margin-bottom:12px"></div>';
+    pk += '<div id="pfgrid" style="margin-bottom:16px"></div>';
+    h = pk + h;   // chọn máy nằm trên cùng
   }
   h += '<button class="btn" onclick="savePlan()">' + ic("ok") + '<span id="pfsave">' + T("LƯU KẾ HOẠCH") + '</span></button>';
   if (e) h += '<button class="btn w" style="margin-top:10px;color:var(--r)" onclick="stopPlan()">' + ic("x") + T("Ngừng kế hoạch này") + '</button>';
@@ -1297,7 +1297,7 @@ function savePlan(){
   if (!task){ toast(T("Nhập hạng mục bảo trì"), "err"); return; }
   if (!due){ toast(T("Chọn ngày"), "err"); return; }
   const d = {devId: devs[0], task, steps: $("#psteps").value.split("\n").map(s => s.trim()).filter(Boolean), unit: $("#punit").value,
-    every: Math.max(1, parseInt($("#pevery").value) || 1), nextDue: due, assignee: $("#pwho").value, note: $("#pnote").value.trim(), active: true};
+    every: Math.max(1, parseInt($("#pevery").value) || 1), nextDue: due, assignee: "", note: $("#pnote").value.trim(), active: true};
   if (V.p.id){ put("plans", V.p.id, d, true); savedMsg(); }
   else { devs.forEach(c => put("plans", uid(), Object.assign({}, d, {devId: c, createdAt: Date.now(), createdBy: S.user.id}))); toast(T("Đã tạo kế hoạch cho {n} máy", {n: devs.length}), "ok"); vib(); }
   F = {}; back();
