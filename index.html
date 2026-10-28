@@ -185,6 +185,7 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .atbl .ttx{min-width:150px;font-weight:500}
 .atbl .thm{font-weight:800;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .atbl .tnm{font-weight:600;white-space:nowrap}
+.atbl .tpart{min-width:130px;font-size:13.5px;font-weight:500;line-height:1.35}.atbl .tpart div+div{margin-top:2px}.atbl .tpart b{font-weight:800;white-space:nowrap}
 .atbl .ttot{font-weight:800;font-size:15px;color:var(--a);white-space:nowrap}
 .atbl .tres{display:inline-block;border-radius:8px;padding:2px 9px;font-weight:700;font-size:13px;white-space:nowrap}
 .atbl .tres.g{background:var(--gl);color:var(--g2)}.atbl .tres.r{background:var(--rl);color:var(--r)}.atbl .tres.o{margin-left:4px}
@@ -276,7 +277,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "23/10/2026 13:20";
+const VERSION = "28/10/2026 08:45";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -697,13 +698,14 @@ function tblLog(L, done){
       (done ? tAppr(l) : '<td class="tact">' + tSt(l, canApproveLog(l), "approveLog") + '</td>') + '</tr>').join("") + '</tbody></table></div>';
 }
 function tblInc(L, done){
-  const th = ["Ngày", "Tên máy", "Người báo", "Giờ báo", "Người sửa", "Giờ xong", "Tổng thời gian sửa", done ? "Người duyệt" : ""];
+  const th = ["Ngày", "Tên máy", "Người báo", "Giờ báo", "Người sửa", "Giờ xong", "Tổng thời gian sửa", "Linh kiện đã thay", done ? "Người duyệt" : ""];
   return '<div class="tscroll"><table class="atbl"><thead><tr>' + th.map(x => '<th>' + esc(x ? T(x) : "") + '</th>').join("") + '</tr></thead><tbody>' +
     L.map(i => '<tr onclick="go(\'incident\',{id:\'' + i._id + '\'})" title="' + esc((i.desc || "") + (i.fix ? " → " + i.fix : "")) + '">' +
       '<td class="tdt">' + cDate(i.at) + '</td>' + tDev(i.devId) +
       '<td class="tnm">' + esc(sName(i.byName)) + '</td><td class="thm">' + cHM(i.at) + '</td>' +
       '<td class="tnm">' + esc(sName(i.fixBy || i.byName)) + '</td><td class="thm">' + cHM(i.fixAt) + (i.fixAt && cDate(i.fixAt) !== cDate(i.at) ? '<small>' + esc(cDate(i.fixAt).slice(0, 5)) + '</small>' : "") + '</td>' +
       '<td class="ttot">' + (i.fixAt ? esc(fmtDur(i.fixAt - i.at)) : "") + '</td>' +
+      '<td class="tpart">' + (i.parts && i.parts.length ? i.parts.map(r => '<div>' + esc(r.n) + ' <b>× ' + esc(r.q) + '</b></div>').join("") : '<span class="mu">–</span>') + '</td>' +
       (done ? tAppr(i) : '<td class="tact">' + tSt(i, canApprove(i), "approveInc") + '</td>') + '</tr>').join("") + '</tbody></table></div>';
 }
 function cLogRow(l){
@@ -1701,8 +1703,8 @@ async function exp(k){
         .concat(L.map(x => [fmtDT(x.at), x.devId, x.devName, x.group, x.gauge, x.area, x.name, x.qty, x.src === "inc" ? T("Sửa máy hỏng") : T("Bảo trì định kỳ"), x.byName])));
     } else {
       const L = docs("incidents", await Q("incidents", "month", m).get()).sort((a, b) => a.at - b.at);
-      csvDown("su-co-" + m + ".csv", [[T("Ngày giờ báo"), T("Mã máy"), T("Tên máy"), T("Mô tả"), T("Người báo"), T("Tình trạng"), T("Hướng xử lý"), T("Khắc phục"), T("Người sửa xong"), T("Xong lúc"), T("Thời gian sửa (phút)")]]
-        .concat(L.map(i => [fmtDT(i.at), i.devId, i.devName, i.desc, i.byName, T(ISTATUS[iSt(i)][0]), i.next, i.fix, i.fixBy || "", fmtDT(i.fixAt), i.fixAt ? Math.round((i.fixAt - i.at) / 60000) : ""])));
+      csvDown("su-co-" + m + ".csv", [[T("Ngày giờ báo"), T("Mã máy"), T("Tên máy"), T("Mô tả"), T("Người báo"), T("Tình trạng"), T("Hướng xử lý"), T("Khắc phục"), T("Người sửa xong"), T("Xong lúc"), T("Thời gian sửa (phút)"), T("Linh kiện đã thay")]]
+        .concat(L.map(i => [fmtDT(i.at), i.devId, i.devName, i.desc, i.byName, T(ISTATUS[iSt(i)][0]), i.next, i.fix, i.fixBy || "", fmtDT(i.fixAt), i.fixAt ? Math.round((i.fixAt - i.at) / 60000) : "", (i.parts || []).map(r => r.n + " × " + r.q).join("; ")])));
     }
   } catch(e){ onErr(e); } finally { busy(false); }
 }
