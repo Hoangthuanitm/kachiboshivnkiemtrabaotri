@@ -186,6 +186,13 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .atbl .thm{font-weight:800;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .atbl .tnm{font-weight:600;white-space:nowrap}
 .atbl .tpart{min-width:130px;font-size:13.5px;font-weight:500;line-height:1.35}.atbl .tpart div+div{margin-top:2px}.atbl .tpart b{font-weight:800;white-space:nowrap}
+.pov{position:fixed;inset:0;z-index:70;background:rgba(20,30,24,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.pbox{background:#fff;border-radius:16px;width:100%;max-width:860px;max-height:calc(100vh - 32px);display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,.25);overflow:hidden}
+.phd{display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--g);color:#fff}.phd .f{flex:1;min-width:0}.pbd .code{white-space:nowrap}.pbd .atbl th{white-space:nowrap}.phd .pt{font-weight:800;font-size:18px}.phd .ps{font-size:13px;opacity:.9;margin-top:2px}
+.pcx{flex:none;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}.pcx svg.i{width:20px;height:20px}
+.pbd{padding:14px 16px;overflow:auto}.pbd .tscroll{margin-bottom:8px}
+td.pdbtn{text-align:right;white-space:nowrap}td.pdbtn .btn.sm{height:34px;padding:0 12px}
+@media (max-width:759px){.pov{padding:0;align-items:flex-end}.pbox{max-height:88vh;border-radius:16px 16px 0 0}}
 .atbl .ttot{font-weight:800;font-size:15px;color:var(--a);white-space:nowrap}
 .atbl .tres{display:inline-block;border-radius:8px;padding:2px 9px;font-weight:700;font-size:13px;white-space:nowrap}
 .atbl .tres.g{background:var(--gl);color:var(--g2)}.atbl .tres.r{background:var(--rl);color:var(--r)}.atbl .tres.o{margin-left:4px}
@@ -277,7 +284,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "28/10/2026 08:45";
+const VERSION = "28/10/2026 09:00";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -1523,13 +1530,35 @@ function drawReport(m, ms){
   const tq = parts.reduce((a, x) => a + (+x.qty || 0), 0);
   h += '<div class="card"><div class="row" style="flex-wrap:wrap;margin-bottom:6px"><div class="b f">' + esc(T("Linh kiện đã thay trong tháng")) + '</div>' +
     (parts.length ? '<span class="sm mu">' + esc(T("Tổng {q} linh kiện · {n} lần thay · {d} máy", {q: tq, n: parts.length, d: new Set(parts.map(x => x.devId)).size})) + '</span>' : "") + '</div>' +
-    (parts.length ? '<div class="scroll"><table class="t"><thead><tr><th>' + esc(T("Linh kiện")) + '</th><th>' + esc(T("Theo nhóm máy")) + '</th><th class="n">' + esc(T("Số máy")) + '</th><th class="n">' + esc(T("Tổng SL")) + '</th></tr></thead><tbody>' +
-      Object.entries(pt).sort((a, b) => b[1].q - a[1].q).map(([n, o]) => '<tr><td><b>' + esc(n) + '</b></td><td class="sm">' + Object.entries(o.by).sort((a, b) => b[1] - a[1]).map(([g, q]) => esc(g) + ': <b>' + q + '</b>').join(" · ") + '</td><td class="n">' + o.dev.size + '</td><td class="n"><b>' + o.q + '</b></td></tr>').join("") + '</tbody></table></div>'
+    (parts.length ? '<div class="scroll"><table class="t"><thead><tr><th>' + esc(T("Linh kiện")) + '</th><th>' + esc(T("Theo nhóm máy")) + '</th><th class="n">' + esc(T("Số máy")) + '</th><th class="n">' + esc(T("Tổng SL")) + '</th><th></th></tr></thead><tbody>' +
+      (F.repPN = Object.entries(pt).sort((a, b) => b[1].q - a[1].q)).map(([n, o], k) => '<tr><td><b>' + esc(n) + '</b></td><td class="sm">' + Object.entries(o.by).sort((a, b) => b[1] - a[1]).map(([g, q]) => esc(g) + ': <b>' + q + '</b>').join(" · ") + '</td><td class="n">' + o.dev.size + '</td><td class="n"><b>' + o.q + '</b></td><td class="pdbtn"><button class="btn sm w" onclick="partPop(' + k + ')">' + esc(T("Chi tiết")) + '</button></td></tr>').join("") + '</tbody></table></div>'
       : '<div class="mu sm">' + esc(T("Tháng này chưa ghi linh kiện nào.")) + '</div>') + '</div>';
   h += '<div class="btns"><button class="btn w" onclick="exp(\'log\')">' + ic("down") + T("Xuất nhật ký bảo trì") + '</button><button class="btn w" onclick="exp(\'inc\')">' + ic("down") + T("Xuất sự cố") + '</button><button class="btn w" onclick="exp(\'part\')">' + ic("down") + T("Xuất linh kiện") + '</button></div>';
   h += '<div class="mu sm" style="margin-top:10px">' + esc(T("Thời gian hỏng tính từ lúc báo sự cố đến lúc bấm \"Đã sửa xong\"; sự cố chưa xong tính đến hiện tại. Số liệu tháng tính theo sự cố được báo trong tháng.")) + '</div>';
   el.innerHTML = h;
 }
+
+/* ---- Popup chi tiết 1 linh kiện trong tháng: thay cho máy nào, thiết bị nào ---- */
+function partPop(k){
+  const e = (F.repPN || [])[k]; if (!e) return; const name = e[0], m = F.repM;
+  const L = (F.repCache["p" + m] || []).filter(x => x.name === name).sort((a, b) => b.at - a.at);
+  const q = L.reduce((a, x) => a + (+x.qty || 0), 0), nd = new Set(L.map(x => x.devId)).size;
+  closePop();
+  const ov = document.createElement("div"); ov.className = "pov"; ov.id = "pov";
+  ov.onclick = ev => { if (ev.target === ov) closePop(); };
+  ov.innerHTML = '<div class="pbox" role="dialog" aria-modal="true"><div class="phd"><div class="f"><div class="pt">' + esc(name) + '</div><div class="ps">' +
+    esc(T("Tháng {m} · {n} lần thay · {d} máy · Tổng SL {q}", {m: m.slice(5) + "/" + m.slice(0, 4), n: L.length, d: nd, q: q})) + '</div></div>' +
+    '<button class="pcx" onclick="closePop()" aria-label="' + esc(T("Đóng")) + '">' + ic("x") + '</button></div>' +
+    '<div class="pbd"><div class="tscroll"><table class="atbl"><thead><tr><th>' + [T("Ngày"), T("Mã máy"), T("Thiết bị"), T("Nhóm máy"), T("Khu vực"), T("SL"), T("Người thay"), T("Từ")].map(x => esc(x)).join('</th><th>') + '</th></tr></thead><tbody>' +
+    L.map(x => '<tr' + (x.srcId ? ' onclick="closePop();go(\'' + (x.src === "log" ? "log" : "incident") + '\',{id:\'' + esc(x.srcId) + '\'})"' : ' style="cursor:default"') + '>' +
+      '<td class="tdt">' + cDate(x.at) + '</td><td><span class="code">' + esc(x.devId) + '</span></td><td class="ttx">' + esc(x.devName || devName(x.devId)) + '</td>' +
+      '<td>' + esc(groupLabel(x) || "–") + '</td><td>' + esc(x.area || "–") + '</td><td class="thm">' + esc(x.qty) + '</td><td class="tnm">' + esc(sName(x.byName || "")) + '</td>' +
+      '<td><span class="tres ' + (x.src === "log" ? "g" : "r") + '">' + esc(T(x.src === "log" ? "Bảo trì" : "Sự cố")) + '</span></td></tr>').join("") +
+    '</tbody></table></div><div class="mu sm">' + esc(T("Bấm vào một dòng để mở phiếu sự cố / bảo trì gốc.")) + '</div></div></div>';
+  document.body.appendChild(ov); document.body.style.overflow = "hidden";
+}
+function closePop(){ const o = $("#pov"); if (o){ o.remove(); document.body.style.overflow = ""; } }
+document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); });
 
 /* ---- Thêm (menu quản lý) ---- */
 VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
@@ -2061,6 +2090,15 @@ const JA = {
 "Linh kiện": "部品",
 "Theo nhóm máy": "設備グループ別",
 "Tổng SL": "合計数量",
+"Chi tiết": "詳細",
+"Đóng": "閉じる",
+"SL": "数量",
+"Tháng {m} · {n} lần thay · {d} máy · Tổng SL {q}": "{m}月分・交換{n}回・{d}台・合計{q}",
+"Thiết bị": "設備",
+"Người thay": "交換者",
+"Từ": "発生元",
+"Bảo trì": "保全",
+"Bấm vào một dòng để mở phiếu sự cố / bảo trì gốc.": "行をタップすると元の故障・保全記録を開きます。",
 "Tháng này chưa ghi linh kiện nào.": "今月の部品交換記録はありません。",
 "Xuất linh kiện": "交換部品を出力",
 "Số lượng": "数量",
