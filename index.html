@@ -215,6 +215,12 @@ td.pdbtn{text-align:right;white-space:nowrap}td.pdbtn .btn.sm{height:34px;paddin
 .prodband b{font-size:16px;line-height:1.2;letter-spacing:.2px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .prodband b.sm{font-size:14px}.prodband b.xs{font-size:12.5px;-webkit-line-clamp:3}
 .prodband.none{background:#eceeec;color:var(--mu)}.prodband.none b{font-weight:600;font-size:14px}
+.prodband.nop{background:#3d4450;color:#fff}.prodband.nop small{opacity:.8}.prodband.nop b{font-size:15px}
+.fc.pc.nop{background:#3d4450;color:#fff;border-color:#3d4450}.fc.pc.nop span{color:#fff;opacity:.85}.fc.pc.nop.on{outline:3px solid #9aa3b2}
+.nopt{color:#3d4450}
+.nopck{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 12px;border:1.5px solid var(--bd);border-radius:12px;background:#fff;cursor:pointer;flex-wrap:wrap}
+.nopck input{width:24px;height:24px;accent-color:#3d4450;flex:none;margin:0}.nopck span{font-weight:700;font-size:16px}.nopck small{color:var(--mu);font-size:13px}
+.nopck.on{background:#3d4450;border-color:#3d4450;color:#fff}.nopck.on small{color:#d6dae2}
 .gbadge{position:absolute;left:8px;bottom:8px;background:var(--g2);color:#fff;font-weight:800;font-size:13px;border-radius:8px;padding:2px 8px}
 .dt .pic{position:relative}
 /* Thiết bị dạng ô */
@@ -284,7 +290,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "30/10/2026 09:15";
+const VERSION = "30/10/2026 09:30";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -767,7 +773,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
     '<dl class="info" style="margin-top:12px">' +
       (d.group ? '<dt>' + esc(T("Nhóm máy")) + '</dt><dd>' + esc(d.group) + '</dd>' : "") +
       (d.gauge ? '<dt>' + esc(T("Loại máy")) + '</dt><dd>' + esc(d.gauge) + '</dd>' : "") +
-      (isKnit(d.group) ? '<dt>' + esc(T("Mã hàng đang chạy")) + '</dt><dd>' + (d.product ? '<b>' + esc(d.product) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : '<span class="mu">' + esc(T("Chưa có mã hàng")) + '</span>') + '</dd>' : "") +
+      (isKnit(d.group) ? '<dt>' + esc(T("Mã hàng đang chạy")) + '</dt><dd>' + (d.noProd ? '<b class="nopt">' + esc(T("Không có mã hàng")) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : d.product ? '<b>' + esc(d.product) + '</b> <span class="sm mu">' + esc(T("từ {t}", {t: fmtDT(d.productSince)})) + '</span>' : '<span class="mu">' + esc(T("Chưa có mã hàng")) + '</span>') + '</dd>' : "") +
       (d.area ? '<dt>' + esc(T("Khu vực")) + '</dt><dd>' + esc(d.area) + '</dd>' : "") +
       ((d.maker || d.model) ? '<dt>' + esc(T("Hãng / Model")) + '</dt><dd>' + esc([d.maker, d.model].filter(Boolean).join(" / ")) + '</dd>' : "") +
       (d.since ? '<dt>' + esc(T("Ngày sử dụng")) + '</dt><dd>' + esc(fmtD(d.since)) + '</dd>' : "") +
@@ -1190,15 +1196,17 @@ VIEWS.knit = {wide: true, live: true, title: () => T("Máy đan"), html(){
   h += '<div id="knsum"></div><div id="knlist"></div>';
   return h;
 }, after(){ drawKnit(); }};
-function knFiltered(){ return knitDevs().filter(d => (!F.g || d.gauge === F.g) && (F.p === null || (d.product || "") === F.p)); }
+const NOPROD = "!none";   // khoá lọc cho máy "Không có mã hàng"
+const pKey = d => d.noProd ? NOPROD : (d.product || "");
+function knFiltered(){ return knitDevs().filter(d => (!F.g || d.gauge === F.g) && (F.p === null || pKey(d) === F.p)); }
 function drawKnit(){
   const el = $("#knlist"); if (!el) return;
   document.querySelectorAll("#kngauge .fc").forEach(b => b.classList.toggle("on", b.getAttribute("onclick").indexOf("F.g='" + F.g + "'") >= 0));
   // tóm tắt theo mã hàng (bấm để lọc)
   const base = knitDevs().filter(d => !F.g || d.gauge === F.g), cnt = {};
-  base.forEach(d => { const k = d.product || ""; cnt[k] = (cnt[k] || 0) + 1; });
+  base.forEach(d => { const k = pKey(d); cnt[k] = (cnt[k] || 0) + 1; });
   $("#knsum").innerHTML = '<div class="mu sm" style="margin:2px 2px 6px">' + esc(T("Mã hàng đang chạy")) + ':</div><div class="fchips">' +
-    Object.entries(cnt).sort((a, b) => (a[0] ? 0 : 1) - (b[0] ? 0 : 1) || b[1] - a[1]).map(([p, n]) => '<button class="fc pc' + (F.p === p ? " on" : "") + '" onclick="F.p=F.p===\'' + esc(p) + '\'?null:\'' + esc(p) + '\';drawKnit()">' + esc(p || T("Chưa có mã hàng")) + ' <span>' + n + '</span></button>').join("") + '</div>';
+    Object.entries(cnt).sort((a, b) => (a[0] && a[0] !== NOPROD ? 0 : a[0] ? 1 : 2) - (b[0] && b[0] !== NOPROD ? 0 : b[0] ? 1 : 2) || b[1] - a[1]).map(([p, n]) => '<button class="fc pc' + (p === NOPROD ? " nop" : "") + (F.p === p ? " on" : "") + '" onclick="F.p=F.p===\'' + esc(p) + '\'?null:\'' + esc(p) + '\';drawKnit()">' + esc(p === NOPROD ? T("Không có mã hàng") : p || T("Chưa có mã hàng")) + ' <span>' + n + '</span></button>').join("") + '</div>';
   const L = knFiltered();
   el.innerHTML = L.length ? '<div class="dgrid">' + L.map(knitTile).join("") + '</div>' : empty("knit", T("Không có máy phù hợp"));
   const n = $("#knN"); if (n) n.textContent = Object.keys(F.sel).filter(k => F.sel[k]).length;
@@ -1211,9 +1219,9 @@ function knitTile(d){
     (F.mode ? '<span class="sel ' + (on ? "on" : "") + '">' + ic("ok") + '</span>' : "") +
     '<span class="dst">' + chip(s[0], s[1]) + '</span>' +
     '<div class="pic"><i class="mimg"></i>' + (d.gauge ? '<span class="gbadge">' + esc(d.gauge) + '</span>' : "") + '</div>' +
-    '<div class="prodband' + (d.product ? "" : " none") + '"><small>' + esc(T("Mã hàng")) + '</small><b class="' + pSize(d.product) + '">' + esc(d.product || T("Chưa có")) + '</b></div>' +
+    '<div class="prodband' + (d.noProd ? " nop" : d.product ? "" : " none") + '"><small>' + esc(T("Mã hàng")) + '</small><b class="' + (d.noProd ? "" : pSize(d.product)) + '">' + esc(d.noProd ? T("Không có mã hàng") : d.product || T("Chưa có")) + '</b></div>' +
     '<div class="dtb"><div class="code dcd">' + esc(d._id) + '</div><div class="dnm">' + esc(d.name || "") + '</div>' +
-    '<div class="dmeta">' + esc(d.product && d.productSince ? T("từ {t}", {t: fmtDT(d.productSince)}) : (d.area || "")) + '</div></div></div>';
+    '<div class="dmeta">' + esc((d.product || d.noProd) && d.productSince ? T("từ {t}", {t: fmtDT(d.productSince)}) : (d.area || "")) + '</div></div></div>';
 }
 /* Bảng thêm mã hàng: bước 1 chọn máy (chạm vào ô), bước 2 chọn mã hàng, rồi lưu */
 function knPanel(){
@@ -1221,25 +1229,26 @@ function knPanel(){
   return '<div class="row" style="flex-wrap:wrap;gap:8px"><div class="b knt"><span class="stepn">1</span>' + esc(T("Chọn máy")) + ' <span class="kncount"><span id="knN">' + n + '</span> ' + esc(T("máy")) + '</span></div>' +
       '<button class="btn sm gh" onclick="knSelAll()">' + esc(T("Chọn tất cả")) + '</button><button class="btn sm w" onclick="F.mode=false;F.sel={};render(true)">' + esc(T("Huỷ")) + '</button></div>' +
     '<div class="b" style="margin:12px 0 8px;font-size:17px"><span class="stepn">2</span>' + esc(T("Chọn mã hàng")) + '</div>' +
-    (P.length ? '<select id="kprod" onchange="F.prod=this.value;knPick()"><option value="">' + esc(T("— Chọn mã hàng —")) + '</option>' +
+    (P.length ? '<select id="kprod"' + (F.noProd ? " disabled" : "") + ' onchange="F.prod=this.value;knPick()"><option value="">' + esc(T("— Chọn mã hàng —")) + '</option>' +
         P.map(p => '<option' + (F.prod === p ? " selected" : "") + '>' + esc(p) + '</option>').join("") + '</select>'
       : '<div class="mu sm">' + esc(T("Chưa có mã hàng. Thêm trong Cài đặt danh mục → Mã hàng máy đan.")) + '</div>') +
+    '<label class="nopck' + (F.noProd ? " on" : "") + '"><input type="checkbox" id="knnone"' + (F.noProd ? " checked" : "") + ' onchange="F.noProd=this.checked;if(this.checked)F.prod=\'\';const k=$(\'#knpanel\');if(k)k.innerHTML=knPanel()"><span>' + esc(T("Không có mã hàng")) + '</span><small>' + esc(T("Máy không chạy hàng")) + '</small></label>' +
     '<button class="btn" id="knsave" style="margin-top:10px" onclick="saveProd(false, knSelected())">' + ic("ok") + '<span id="knsavet">' + esc(knSaveLabel()) + '</span></button>';
 }
 const knSelected = () => Object.keys(F.sel).filter(k => F.sel[k] && S.dev[k]);
-const knSaveLabel = () => F.prod ? T("LƯU MÃ {p} CHO {n} MÁY", {p: F.prod, n: knSelected().length}) : T("LƯU MÃ HÀNG");
+const knSaveLabel = () => F.noProd ? T("LƯU KHÔNG CÓ MÃ HÀNG CHO {n} MÁY", {n: knSelected().length}) : F.prod ? T("LƯU MÃ {p} CHO {n} MÁY", {p: F.prod, n: knSelected().length}) : T("LƯU MÃ HÀNG");
 function knPick(){ const t = $("#knsavet"); if (t) t.textContent = knSaveLabel(); }
 function knSelAll(){ const L = knFiltered(), all = L.every(d => F.sel[d._id]); L.forEach(d => F.sel[d._id] = !all); drawKnit(); }
 function saveProd(clear, list){
   if (!canSetProd()) return;
-  const codes = (list || []).filter(c => S.dev[c]), p = clear ? "" : String(F.prod || "").trim();
+  const none = !clear && !!F.noProd, codes = (list || []).filter(c => S.dev[c]), p = clear || none ? "" : String(F.prod || "").trim();
   if (!codes.length){ toast(T("Chưa chọn máy nào"), "err"); return; }
-  if (!clear && !p){ toast(T("Chọn mã hàng"), "err"); return; }
+  if (!clear && !none && !p){ toast(T("Chọn mã hàng"), "err"); return; }
   const now = Date.now(), t = today();
   codes.forEach(c => {
-    const d = S.dev[c]; if ((d.product || "") === p) return;
-    put("devices", c, {product: p, productSince: now, productBy: S.user.name}, true);
-    S.dev[c] = Object.assign({}, d, {product: p, productSince: now});
+    const d = S.dev[c]; if ((d.product || "") === p && !!d.noProd === none) return;
+    put("devices", c, {product: p, noProd: none, productSince: now, productBy: S.user.name}, true);
+    S.dev[c] = Object.assign({}, d, {product: p, noProd: none, productSince: now});
   });
   F = {kn: 1, sel: {}, mode: false, g: "", p: null}; F.histFor = "";
   toast(T("Đã cập nhật mã hàng cho {n} máy", {n: codes.length}), "ok"); vib();
@@ -1720,7 +1729,7 @@ function csvDown(name, rows){
 async function exp(k){
   const m = $("#xm").value || ym();
   if (k === "dev") return csvDown("thiet-bi.csv", [[T("Mã"), T("Nhóm máy"), T("Loại máy"), T("Mã hàng đang chạy"), T("Tên"), T("Khu vực"), T("Hãng"), T("Model"), T("Ngày sử dụng"), T("Trạng thái"), T("Ghi chú")]]
-    .concat(Object.values(S.dev).sort((a, b) => a._id < b._id ? -1 : 1).map(d => [d._id, d.group, d.gauge, d.product || "", d.name, d.area, d.maker, d.model, d.since, T(devState(d)[0]), d.note])));
+    .concat(Object.values(S.dev).sort((a, b) => a._id < b._id ? -1 : 1).map(d => [d._id, d.group, d.gauge, d.noProd ? T("Không có mã hàng") : d.product || "", d.name, d.area, d.maker, d.model, d.since, T(devState(d)[0]), d.note])));
   if (k === "plan") return csvDown("ke-hoach.csv", [[T("Mã máy"), T("Tên máy"), T("Hạng mục"), T("Chu kỳ"), T("Hạn tiếp theo"), T("Người phụ trách"), T("Lần làm gần nhất")]]
     .concat(planList().map(p => [p.devId, devName(p.devId), p.task, cycleText(p), p.nextDue, p.assignee ? ((S.acc[p.assignee] || {}).name || p.assignee) : T("Tất cả công nhân"), p.lastDone || ""])));
   busy(true);
@@ -2011,6 +2020,9 @@ const JA = {
 "Mã hàng đang chạy": "現在の品番",
 "từ {t}": "{t} から",
 "Chưa có mã hàng": "品番未設定",
+"Không có mã hàng": "品番なし",
+"Máy không chạy hàng": "生産なしの設備",
+"LƯU KHÔNG CÓ MÃ HÀNG CHO {n} MÁY": "{n} 台を「品番なし」で保存",
 "Lịch sử mã hàng": "品番の履歴",
 "(Không chạy hàng)": "（生産なし）",
 "Chưa có lịch sử mã hàng": "品番の履歴はありません",
