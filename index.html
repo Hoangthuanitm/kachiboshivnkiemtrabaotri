@@ -284,7 +284,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "28/10/2026 09:00";
+const VERSION = "30/10/2026 09:15";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -602,14 +602,17 @@ function devItem(d, sel){
 /* Quy trình sự cố:
    - Người báo (công nhân / tổ trưởng / quản đốc) tự cập nhật từ Đang hỏng đến Đã sửa xong, sửa được báo cáo của mình cho đến khi được duyệt.
    - Quản đốc duyệt cuối cùng, sau khi đã sửa xong. Báo cáo của chính quản đốc tự duyệt khi sửa xong.
-   - Quản trị chỉ theo dõi: không báo, không cập nhật, không duyệt. */
+   - Quản trị không báo, không cập nhật; được duyệt thay quản đốc (người duyệt ghi là Admin). */
 const isWatcher = () => S.user && !isDevice();   // chỉ iPad máy mới báo sự cố, ghi bảo trì; các tài khoản khác chỉ xem
 const canEditDev = () => S.user && S.user.role === "manager";   // thêm/sửa máy, kế hoạch: chỉ quản đốc
 const isLocked = i => i.appr === true || (i.appr === undefined && iSt(i) === "done");   // dữ liệu cũ đã xong = coi như đã duyệt
 const isPend = i => iSt(i) === "done" && i.appr === false;                              // đã sửa xong, chờ quản đốc duyệt
 const canEditInc = i => isDevice() && !isLocked(i);   // iPad: kiểm tra người làm khi lưu   // người báo, hoặc người đã sửa xong (trước khi duyệt)
 const canUpdInc = i => isDevice() && iSt(i) === "open";   // ai cũng cập nhật / sửa tiếp được máy đang hỏng
-const canApprove = i => isPend(i) && S.user.role === "manager" && (i.fixById || i.by) !== S.user.id;
+/* Admin duyệt thay quản đốc; người duyệt ghi là "Admin" */
+const canFinal = () => S.user && (S.user.role === "manager" || S.user.role === "admin");
+const apprName = () => S.user.role === "admin" ? "Admin" : S.user.name;
+const canApprove = i => isPend(i) && canFinal() && (i.fixById || i.by) !== S.user.id;
 const autoAppr = () => me().role === "manager";
 function incItem(i){
   const k = iSt(i), s = ISTATUS[k];
@@ -664,7 +667,7 @@ VIEWS.home = {wide: true, live: true, html(){
     const PI = Object.values(S.incPend).filter(isPend).sort((a, b) => a.fixAt - b.fixAt);
     const tab = F.apTab || (PL.length || !PI.length ? "log" : "inc");
     const tb = (k, t, n) => '<button class="' + (tab === k ? "on" : "") + '" onclick="F.apTab=\'' + k + '\';render(true)">' + esc(T(t)) + (n ? '<span class="n">' + n + '</span>' : "") + '</button>';
-    h += '<h3>' + esc(T("Chờ duyệt")) + '</h3>' + (isAdmin() ? '<div class="mu sm" style="margin:-4px 2px 8px">' + esc(T("Quản trị chỉ xem, quản đốc duyệt.")) + '</div>' : "") +
+    h += '<h3>' + esc(T("Chờ duyệt")) + '</h3>' + (isAdmin() ? '<div class="mu sm" style="margin:-4px 2px 8px">' + esc(T("Quản trị có thể duyệt thay quản đốc. Người duyệt được ghi là Admin.")) + '</div>' : "") +
       '<div class="tabs">' + tb("log", "Bảo trì", PL.length) + tb("inc", "Báo cáo sự cố", PI.length) + '</div>';
     const tblF = tab === "log" ? tblLog : tblInc;
     if (tab === "log") h += PL.length ? tblF(PL, false) : '<div class="cnone">' + esc(T("Không có bảo trì nào chờ duyệt.")) + '</div>';
@@ -1090,10 +1093,10 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
 const curInc = () => (F.incCache && F.incCache._id === V.p.id && Date.now() - (F.incCache._fresh || 0) < 5000) ? F.incCache : (S.incPend[V.p.id] || S.incOpen[V.p.id] || S.incMonth.find(x => x._id === V.p.id) || F.incCache);
 /* Danh sách các lần ghi hướng xử lý; dữ liệu cũ chỉ có 1 trường next thì đổi thành 1 dòng */
 const nextLog = i => Array.isArray(i.nextLog) ? i.nextLog : (i.next ? [{t: i.next, by: i.nextBy || "", at: i.nextAt || i.at}] : []);
-const canApproveLog = l => l && l.appr === false && S.user.role === "manager";
+const canApproveLog = l => l && l.appr === false && canFinal();
 function approveLog(id){
   const l = S.logPend[id] || (F.logCache && F.logCache._id === id ? F.logCache : null); if (!canApproveLog(l)) return;
-  const u = {appr: true, apprBy: S.user.name, apprById: S.user.id, apprAt: Date.now(), apprMonth: ym(), partsSaved: true};
+  const u = {appr: true, apprBy: apprName(), apprById: S.user.id, apprAt: Date.now(), apprMonth: ym(), partsSaved: true};
   if (l.parts && l.parts.length && !l.partsSaved) saveParts(l.parts, l.devId, "log", id, {id: l.by, name: l.byName});   // linh kiện thay khi bảo trì: tính khi duyệt
   put("logs", id, u, true); F.logCache = Object.assign({}, l, u, {_id: id}); delete S.logPend[id]; S.logAppr = S.logAppr.filter(x => x._id !== id).concat([F.logCache]);
   toast(T("Đã duyệt"), "ok"); vib(); render(true);
@@ -1128,7 +1131,7 @@ VIEWS.log = {title: () => T("Kết quả bảo trì"), html(){
   if (canApproveLog(l)) h += '<button class="btn y" style="margin-top:12px" onclick="approveLog(\'' + l._id + '\')">' + ic("ok") + T("DUYỆT") + '</button>';
   return h;
 }, after(){ const l = S.logPend[V.p.id] || F.logCache; if (l) loadPhotos(l.photos, $("#logph")); }};
-const apprFields = i => ({appr: true, apprBy: me().name, apprById: me().id, apprAt: Date.now(), apprMonth: ym()});
+const apprFields = i => ({appr: true, apprBy: S.user && S.user.role === "admin" ? "Admin" : me().name, apprById: me().id, apprAt: Date.now(), apprMonth: ym()});
 function approveInc(id){
   const i = id ? curInc0(id) : curInc(); if (!i || !canApprove(i)) return;
   const u = apprFields(i);
@@ -1939,6 +1942,7 @@ const JA = {
 "Bảo trì": "保全",
 "Báo cáo sự cố": "異常報告",
 "Không có bảo trì nào chờ duyệt.": "承認待ちの保全はありません。",
+"Quản trị có thể duyệt thay quản đốc. Người duyệt được ghi là Admin.": "管理者は工場長に代わって承認できます。承認者はAdminと記録されます。",
 "Quản trị chỉ xem, quản đốc duyệt.": "管理者は閲覧のみ、承認は職長が行います。",
 "Thời gian báo": "報告日時",
 "Hạn": "期限",
