@@ -47,6 +47,10 @@ h3{font-size:17px;margin:18px 0 8px;color:var(--g2)}
 .btn:active{transform:scale(.98)}
 .btn.y{background:var(--y);color:#2a2a00}.btn.r{background:var(--r)}.btn.w{background:#fff;color:var(--g2);border:1.5px solid var(--bd)}.btn.gh{background:var(--gl);color:var(--g2)}
 .btn.sm{min-height:46px;font-size:16px;width:auto;border-radius:12px}
+.btn.rj{background:#fff;color:var(--r);border:1.5px solid var(--r)}.apbtns{display:inline-flex;gap:6px;align-items:center;flex:none}
+.rjbox{border:1.5px solid var(--r);background:var(--rl);border-radius:12px;padding:10px 12px;margin-top:12px;color:#5a1010}.rjbox b{color:var(--r)}.rjbox .rjn{font-size:16px;font-weight:600;margin-top:4px;white-space:pre-wrap}.rjbox .rjh{font-size:12.5px;margin-top:6px;opacity:.8}
+.pbox.sm{max-width:520px}.phd.r{background:var(--r)}.rjinfo{font-size:14px;margin-bottom:10px;line-height:1.45}
+.it.rjit{border-left:5px solid var(--r)}.it.rjit .t2.rjr{color:var(--r);font-weight:600;margin-top:3px}
 .btn[disabled]{opacity:.5}
 .bigscan{min-height:116px;font-size:24px;border-radius:20px;flex-direction:column;gap:6px;box-shadow:0 6px 18px rgba(47,109,66,.3)}
 .bigscan svg.i{width:46px;height:46px}
@@ -290,7 +294,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "30/10/2026 09:30";
+const VERSION = "02/11/2026 11:30";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -454,7 +458,7 @@ function withTimeout(p, ms){ return Promise.race([p, new Promise((_, rej) => set
 const savedMsg = () => toast(navigator.onLine ? T("Đã lưu") : T("Đã lưu. Có mạng sẽ tự gửi lên."), "ok");
 
 /* ================== TRẠNG THÁI ================== */
-const S = {user: null, dev: {}, plans: {}, acc: {}, incOpen: {}, incPend: {}, logPend: {}, logAppr: [], incAppr: [], incMonth: [], logsMonth: [], cfg: Object.assign({}, DEF_CFG), loaded: {}};
+const S = {user: null, dev: {}, plans: {}, acc: {}, incOpen: {}, incPend: {}, logPend: {}, logRej: {}, logAppr: [], incAppr: [], incMonth: [], logsMonth: [], cfg: Object.assign({}, DEF_CFG), loaded: {}};
 let V = {view: "home", p: {}};
 let UNSUB = [];
 let PH = [];            // ảnh đang chọn trong form
@@ -504,6 +508,7 @@ function startLive(){
     sub(Q("logs", "apprMonth", ym()), sn => { S.logAppr = docs("logs", sn); liveRender(); });
     sub(Q("incidents", "apprMonth", ym()), sn => { S.incAppr = docs("incidents", sn); liveRender(); });
   }
+  if (isDevice()) sub(Q("logs", "rej", true), sn => { S.logRej = {}; docs("logs", sn).forEach(d => S.logRej[d._id] = d); liveRender(); });   // bảo trì bị trả lại: iPad sửa và gửi lại
   if (isMgr()) sub(Q("logs", "appr", false), sn => { S.logPend = {}; docs("logs", sn).forEach(d => S.logPend[d._id] = d); liveRender(); });   // bảo trì chờ duyệt
 }
 function stopLive(){ UNSUB.forEach(u => { try { u(); } catch(e){} }); UNSUB = []; }
@@ -612,7 +617,7 @@ function devItem(d, sel){
 const isWatcher = () => S.user && !isDevice();   // chỉ iPad máy mới báo sự cố, ghi bảo trì; các tài khoản khác chỉ xem
 const canEditDev = () => S.user && S.user.role === "manager";   // thêm/sửa máy, kế hoạch: chỉ quản đốc
 const isLocked = i => i.appr === true || (i.appr === undefined && iSt(i) === "done");   // dữ liệu cũ đã xong = coi như đã duyệt
-const isPend = i => iSt(i) === "done" && i.appr === false;                              // đã sửa xong, chờ quản đốc duyệt
+const isPend = i => iSt(i) === "done" && i.appr === false && !i.rej;                              // đã sửa xong, chờ quản đốc duyệt
 const canEditInc = i => isDevice() && !isLocked(i);   // iPad: kiểm tra người làm khi lưu   // người báo, hoặc người đã sửa xong (trước khi duyệt)
 const canUpdInc = i => isDevice() && iSt(i) === "open";   // ai cũng cập nhật / sửa tiếp được máy đang hỏng
 /* Admin duyệt thay quản đốc; người duyệt ghi là "Admin" */
@@ -620,6 +625,45 @@ const canFinal = () => S.user && (S.user.role === "manager" || S.user.role === "
 const apprName = () => S.user.role === "admin" ? "Admin" : S.user.name;
 const canApprove = i => isPend(i) && canFinal() && (i.fixById || i.by) !== S.user.id;
 const autoAppr = () => me().role === "manager";
+/* Không duyệt: quản đốc / admin trả lại kèm lý do; người báo sửa rồi gửi lại (rej = false, quay về Chờ duyệt) */
+const isRej = x => !!x && x.rej === true && x.appr !== true;
+const rejBtn = (x, fn) => '<button class="btn sm rj" onclick="event.stopPropagation();rejPop(\'' + (fn === "approveLog" ? "log" : "inc") + '\',\'' + x._id + '\')">✖ ' + esc(T("Không duyệt")) + '</button>';
+const apBtns = (x, fn) => '<span class="apbtns"><button class="btn sm" onclick="event.stopPropagation();' + fn + '(\'' + x._id + '\')">' + ic("ok") + T("Duyệt") + '</button>' + rejBtn(x, fn) + '</span>';
+/* Khung lý do không duyệt (lần gần nhất), kèm số lần đã bị trả lại */
+function rejBox(x){
+  const L = x.rejLog || [], last = L[L.length - 1] || {note: x.rejNote, by: x.rejBy, at: x.rejAt};
+  return '<div class="rjbox"><b>✖ ' + esc(T("Quản đốc không duyệt")) + '</b> · ' + esc((last.by || "") + " · " + fmtDT(last.at)) +
+    '<div class="rjn">' + esc(T("Lý do: {n}", {n: last.note || ""})) + '</div>' +
+    (isRej(x) ? '<div class="rjh">' + esc(T("Người báo cần sửa lại cho đúng rồi gửi lại.")) + '</div>' : "") +
+    (L.length > 1 ? '<div class="rjh">' + esc(T("Đã bị trả lại {n} lần", {n: L.length})) + '</div>' : "") + '</div>';
+}
+/* Popup ghi lý do không duyệt */
+const rejGet = (k, id) => k === "log" ? (S.logPend[id] || (F.logCache && F.logCache._id === id ? F.logCache : null)) : curInc0(id);
+function rejPop(k, id){
+  const x = rejGet(k, id); if (!x || !canFinal()) return;
+  closePop();
+  const ov = document.createElement("div"); ov.className = "pov"; ov.id = "pov";
+  ov.onclick = ev => { if (ev.target === ov) closePop(); };
+  ov.innerHTML = '<div class="pbox sm" role="dialog" aria-modal="true"><div class="phd r"><div class="f"><div class="pt">' + esc(T("Không duyệt")) + '</div><div class="ps">' +
+    esc(T("Trả lại cho người báo để sửa và gửi lại")) + '</div></div><button class="pcx" onclick="closePop()" aria-label="' + esc(T("Đóng")) + '">' + ic("x") + '</button></div>' +
+    '<div class="pbd"><div class="rjinfo"><span class="code">' + esc(x.devId) + '</span> · ' + esc(x.devName || devName(x.devId)) + '<br><b>' + esc(k === "log" ? (x.task || "") : (x.desc || T("Sự cố"))) + '</b><br>' +
+      esc(T(k === "log" ? "Người làm: {n}" : "Báo: {n}", {n: x.byName || ""}) + " · " + fmtDT(x.at)) + '</div>' +
+    '<div class="lc"><label class="req">' + esc(T("Lý do không duyệt")) + '</label><textarea id="rjNote" rows="4" placeholder="' + esc(T("Ví dụ: nhập sai số lượng linh kiện, thiếu ảnh, nội dung sửa chưa rõ…")) + '"></textarea></div>' +
+    '<div class="btns"><button class="btn w" onclick="closePop()">' + esc(T("Huỷ")) + '</button><button class="btn r" onclick="rejGo(\'' + k + '\',\'' + id + '\')">✖ ' + esc(T("Trả lại")) + '</button></div></div></div>';
+  document.body.appendChild(ov); document.body.style.overflow = "hidden";
+  setTimeout(() => { const t = $("#rjNote"); if (t) t.focus(); }, 50);
+}
+function rejGo(k, id){
+  const x = rejGet(k, id); if (!x || !canFinal()) return;
+  if (k === "log" ? !canApproveLog(x) : !canApprove(x)){ closePop(); return; }
+  const note = (($("#rjNote") || {}).value || "").trim();
+  if (!note){ toast(T("Nhập lý do không duyệt"), "err"); const t = $("#rjNote"); if (t) t.focus(); return; }
+  const now = Date.now(), by = apprName();
+  const u = {rej: true, rejNote: note, rejBy: by, rejById: S.user.id, rejAt: now, rejLog: (x.rejLog || []).concat([{note, by, at: now}])};
+  if (k === "log"){ put("logs", id, u, true); F.logCache = Object.assign({}, x, u, {_id: id}); S.logPend[id] = F.logCache; }
+  else { put("incidents", id, u, true); F.incCache = Object.assign({}, x, u, {_fresh: Date.now()}); S.incPend[id] = F.incCache; }
+  closePop(); toast(T("Đã trả lại cho người báo"), "ok"); vib(); render(true);
+}
 function incItem(i){
   const k = iSt(i), s = ISTATUS[k];
   return '<div class="it ' + (k === "done" ? "" : "r") + '" onclick="go(\'incident\',{id:\'' + i._id + '\'})"><div class="f">' +
@@ -627,7 +671,7 @@ function incItem(i){
     '<div class="t2"><span class="code">' + esc(i.devId) + '</span> · ' + esc(i.devName || devName(i.devId)) + ' · ' + esc(fmtDT(i.at)) + '</div>' +
     '<div class="t2">' + esc(T("Báo: {n}", {n: i.byName || ""})) + (i.fixBy && k === "done" ? ' · ' + esc(T("Sửa xong: {n}", {n: i.fixBy})) : "") + '</div>' +
     (k === "open" && i.next ? '<div class="t2" style="color:var(--a)">➜ ' + esc(i.next) + (i.nextBy ? ' (' + esc(i.nextBy) + ')' : "") + '</div>' : "") + '</div>' +
-    '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">' + chip(s[0], s[1]) + (isPend(i) ? chip("Chờ duyệt", "a") : "") +
+    '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">' + chip(s[0], s[1]) + (isPend(i) ? chip("Chờ duyệt", "a") : isRej(i) ? chip("Bị trả lại", "r") : "") +
     '<span class="sm mu">' + esc(k === "open" ? T("{n} ngày", {n: waitDays(i)}) : fmtDur(i.fixAt - i.at)) + '</span></div></div>';
 }
 /* Thời lượng dễ đọc: phút / giờ / ngày */
@@ -659,17 +703,19 @@ VIEWS.home = {wide: true, live: true, html(){
   }
   // báo cáo của mình đang mở hoặc chờ duyệt (công nhân, tổ trưởng)
   if (u.role === "worker" || u.role === "leader"){
-    const mine = Object.values(S.incPend).filter(i => i.by === u.id && !isLocked(i)), mo = mine.filter(i => iSt(i) === "open").length, mp = mine.length - mo;
-    if (mine.length) h += '<button class="brokebar pendbar" onclick="go(\'incidents\',{tab:\'' + (mo ? "open" : "pend") + '\'})">' + ic("clock") + '<span class="f">' +
+    const mine = Object.values(S.incPend).filter(i => i.by === u.id && !isLocked(i)), mo = mine.filter(i => iSt(i) === "open").length, mr = mine.filter(isRej).length, mp = mine.length - mo - mr;
+    if (mr) h += '<button class="brokebar" onclick="go(\'returned\')">' + ic("alert") + '<span class="f">' + esc(T("{n} báo cáo của bạn bị trả lại, cần sửa trên iPad", {n: mr})) + '</span>' + ic("chev") + '</button>';
+    if (mo || mp) h += '<button class="brokebar pendbar" onclick="go(\'incidents\',{tab:\'' + (mo ? "open" : "pend") + '\'})">' + ic("clock") + '<span class="f">' +
       esc([mo ? T("{n} báo cáo của bạn chưa sửa xong", {n: mo}) : "", mp ? T("{n} đang chờ duyệt", {n: mp}) : ""].filter(Boolean).join(" · ")) + '</span>' + ic("chev") + '</button>';
   }
+  if (isDevice()){ const nr = rejList().length; if (nr) h += '<button class="brokebar" onclick="go(\'returned\')">' + ic("alert") + '<span class="f">' + esc(T("{n} báo cáo bị quản đốc trả lại, cần sửa và gửi lại", {n: nr})) + '</span>' + ic("chev") + '</button>'; }
   if (isDevice()) h += '<div class="mu sm" style="margin:0 2px 10px">' + esc(T("Máy tablet dùng chung: khi lưu, chọn tên của bạn và nhập mã PIN.")) + '</div>';
   if (!isWatcher()) h += '<button class="btn w" onclick="go(\'incnew\')">' + ic("alert") + T("Báo sự cố") + '</button>';
   const L = b.over.concat(b.today);
   h += '</div><div><h3 class="h3top">' + esc(T("Việc cần làm")) + '</h3>' + (L.length ? L.slice(0, 8).map(planItem).join("") : empty("ok", T("Hôm nay không có việc cần làm.")));
   // Quản đốc: duyệt ngay dưới Việc cần làm
   if (isMgr()){
-    const PL = Object.values(S.logPend).filter(l => l.appr === false).sort((a, b) => a.at - b.at);
+    const PL = Object.values(S.logPend).filter(l => l.appr === false && !l.rej).sort((a, b) => a.at - b.at);
     const PI = Object.values(S.incPend).filter(isPend).sort((a, b) => a.fixAt - b.fixAt);
     const tab = F.apTab || (PL.length || !PI.length ? "log" : "inc");
     const tb = (k, t, n) => '<button class="' + (tab === k ? "on" : "") + '" onclick="F.apTab=\'' + k + '\';render(true)">' + esc(T(t)) + (n ? '<span class="n">' + n + '</span>' : "") + '</button>';
@@ -678,6 +724,8 @@ VIEWS.home = {wide: true, live: true, html(){
     const tblF = tab === "log" ? tblLog : tblInc;
     if (tab === "log") h += PL.length ? tblF(PL, false) : '<div class="cnone">' + esc(T("Không có bảo trì nào chờ duyệt.")) + '</div>';
     else h += PI.length ? tblF(PI, false) : '<div class="cnone">' + esc(T("Không có báo cáo nào chờ duyệt.")) + '</div>';
+    const RJ = rejList();
+    if (RJ.length) h += '<button class="brokebar pendbar" style="margin-top:10px" onclick="go(\'returned\')">' + ic("alert") + '<span class="f">' + esc(T("{n} báo cáo đã trả lại, đang chờ người báo sửa", {n: RJ.length})) + '</span>' + ic("chev") + '</button>';
     // lịch sử đã duyệt (tháng này), mới nhất ở trên
     const HA = (tab === "log" ? S.logAppr : S.incAppr).filter(x => x.appr === true && x.apprAt).sort((a, b) => b.apprAt - a.apprAt);
     const lim = F.apMore ? 200 : 10;
@@ -697,11 +745,12 @@ const cDate = t => { if (!t) return ""; const d = new Date(t); return pad(d.getD
 const cDay = t => '<span class="cdate">' + cDate(t) + '</span>';
 function cRight(x, can, fn){
   if (x.apprAt && x.appr === true) return '<span class="cok">✔ <span class="nf">' + esc(x.apprBy || "") + '</span><span class="ns">' + esc(String(x.apprBy || "").trim().split(/\s+/).pop()) + '</span><small>' + esc(cTime(x.apprAt)) + '</small></span>';
-  return can ? '<button class="btn sm" onclick="event.stopPropagation();' + fn + '(\'' + x._id + '\')">' + ic("ok") + T("Duyệt") + '</button>' : '<span class="chip a">' + esc(T("Chờ duyệt")) + '</span>';
+  if (isRej(x)) return '<span class="chip r">' + esc(T("Bị trả lại")) + '</span>';
+  return can ? apBtns(x, fn) : '<span class="chip a">' + esc(T("Chờ duyệt")) + '</span>';
 }
 /* Bảng duyệt: bảo trì / sự cố (tên người viết gọn 1 chữ) */
 const sName = n => String(n || "").trim().split(/\s+/).pop() || "";
-const tSt = (x, can, fn) => can ? '<button class="btn sm" onclick="event.stopPropagation();' + fn + '(\'' + x._id + '\')">' + ic("ok") + T("Duyệt") + '</button>' : '<span class="chip a">' + esc(T("Chờ duyệt")) + '</span>';
+const tSt = (x, can, fn) => isRej(x) ? '<span class="chip r">' + esc(T("Bị trả lại")) + '</span>' : can ? apBtns(x, fn) : '<span class="chip a">' + esc(T("Chờ duyệt")) + '</span>';
 const tAppr = x => '<td class="tap"><b>✔ ' + esc(sName(x.apprBy)) + '</b><small>' + esc(fmtDT(x.apprAt)) + '</small></td>';
 const tDev = id => '<td class="tdev"><b>' + esc(devName(id) || id) + '</b><small class="code">' + esc(id) + '</small></td>';
 function tblLog(L, done){
@@ -746,7 +795,7 @@ function apprItem(i){
     '<div class="t2">' + esc(T("Báo: {n}", {n: i.byName || ""}) + " · " + fmtDT(i.at)) + '</div>' +
     '<div class="t2">' + esc(T("Sửa xong: {n}", {n: i.fixBy || i.byName || ""}) + " · " + fmtDT(i.fixAt)) + '</div>' +
     (i.apprAt && !isPend(i) ? '<div class="t2" style="color:var(--g2);font-weight:600">✔ ' + esc(T("Duyệt: {n}", {n: i.apprBy || ""}) + " · " + fmtDT(i.apprAt)) + '</div>' : "") + '</div>' +
-    (canApprove(i) ? '<button class="btn sm" onclick="event.stopPropagation();approveInc(\'' + i._id + '\')">' + ic("ok") + T("Duyệt") + '</button>' : "") + '</div>';
+    (canApprove(i) ? apBtns(i, "approveInc") : "") + '</div>';
 }
 const stat = (n, t, c, on) => '<div class="stat"' + (on ? ' style="cursor:pointer" onclick="' + on + '"' : "") + '><b' + (c ? ' style="color:' + c + '"' : "") + '>' + n + '</b><span>' + esc(t) + '</span></div>';
 
@@ -966,7 +1015,8 @@ VIEWS.incnew = {title: () => V.p.edit ? T("Sửa báo cáo sự cố") : T("Báo
   else if (V.p.code && !F.code) F.code = V.p.code;
   const d = S.dev[F.code];
   const rep = F.edit ? ((curInc0(F.edit) || {}).byName || "") : S.user.name;
-  let h = (isDevice() && !F.edit) ? "" : '<div class="lc"><label>' + esc(T("Người báo")) + '</label><input value="' + esc(rep) + '" readonly style="background:#f2f2f2;font-weight:600"></div>';
+  let h = F.edit && isRej(curInc0(F.edit)) ? rejBox(curInc0(F.edit)) + '<div style="height:12px"></div>' : "";
+  h += (isDevice() && !F.edit) ? "" : '<div class="lc"><label>' + esc(T("Người báo")) + '</label><input value="' + esc(rep) + '" readonly style="background:#f2f2f2;font-weight:600"></div>';
   h += '<div class="lc"><label class="req">' + esc(T("Thiết bị")) + '</label>';
   if (d) h += '<div class="it" style="cursor:default"><div class="f"><div class="t1 code">' + esc(F.code) + '</div><div class="t2">' + esc(d.name) + '</div></div><button class="btn sm w" onclick="F.code=\'\';V.p.code=\'\';render()">' + esc(T("Đổi")) + '</button></div>';
   else h += '<div class="btns"><button class="btn" onclick="openScan(\'inc\')">' + ic("qr") + T("Quét QR") + '</button></div><div style="margin-top:8px">' + devSelect("incdev", "") + '</div>';
@@ -1012,16 +1062,18 @@ function saveInc0(){
   if (F.edit){   // lưu bản sửa của người báo
     const i = curInc0(F.edit);
     if (!i || !canEditInc(i)){ toast(T("Báo cáo đã được duyệt, không sửa được nữa."), "err"); return; }
-    if (isDevice() && me().id !== i.by && !(isPend(i) && i.fixById === me().id)){ toast(T("Chỉ người báo hoặc người đã sửa xong mới sửa được báo cáo này."), "err"); return; }
+    if (isDevice() && me().id !== i.by && !((isPend(i) || isRej(i)) && i.fixById === me().id)){ toast(T("Chỉ người báo hoặc người đã sửa xong mới sửa được báo cáo này."), "err"); return; }
     const u = {devId: F.code, devName: d.name, area: d.area || "", desc: (F.desc || "").trim(), photos: (F.oldPh || []).concat(pids),
       status: F.st, open: F.st !== "done", fix, parts: prow, edits: (i.edits || []).concat([{at: now, by: me().name}])};
+    const wasRej = isRej(i); if (wasRej){ u.rej = false; u.resentAt = now; }   // gửi lại sau khi bị trả lại
     if (F.st === "done"){ u.fixAt = iSt(i) === "done" && i.fixAt ? i.fixAt : now; u.fixBy = me().name; u.fixById = me().id; } else { u.fixAt = null; u.fixBy = ""; u.fixById = ""; }
     if (F.st === "done" && autoAppr()){ Object.assign(u, apprFields(i), {partsSaved: true}); saveParts(prow, F.code, "inc", i._id); }
     put("incidents", i._id, u, true);
     F.incCache = Object.assign({}, i, u, {_fresh: Date.now()}); S.incPend[i._id] = F.incCache;
     if (u.open) S.incOpen[i._id] = F.incCache; else delete S.incOpen[i._id];
     const id = i._id; F = {incCache: F.incCache}; PH = [];
-    savedMsg(); go("incident", {id}, true); return;
+    if (wasRej && !u.appr) toast(T("Đã gửi lại, chờ quản đốc duyệt"), "ok"); else savedMsg();
+    go("incident", {id}, true); return;
   }
   const t = today(), incId = uid(), auto = autoAppr() && F.st === "done";   // quản đốc tự báo và đã sửa xong: tự duyệt
   const doc = {devId: F.code, devName: d.name, area: d.area || "", desc: (F.desc || "").trim(), photos: pids,
@@ -1034,18 +1086,39 @@ function saveInc0(){
   go("device", {code: c}, true);
 }
 
+/* ---- Báo cáo bị trả lại (không duyệt) ---- */
+function rejList(){
+  const u = S.user, mine = x => isMgr() || isDevice() || x.by === u.id || x.fixById === u.id;
+  const I = Object.values(S.incPend).filter(i => isRej(i) && mine(i)).map(x => ({k: "inc", x}));
+  const L = Object.values(isMgr() ? S.logPend : S.logRej).filter(l => isRej(l) && mine(l)).map(x => ({k: "log", x}));
+  return I.concat(L).sort((a, b) => (a.x.rejAt || 0) - (b.x.rejAt || 0));
+}
+VIEWS.returned = {wide: true, live: true, title: () => T("Bị trả lại"), html(){
+  const L = rejList();
+  let h = '<div class="mu sm" style="margin:0 2px 10px">' + esc(T(isDevice() ? "Quản đốc không duyệt các báo cáo dưới đây. Mở từng báo cáo, sửa lại cho đúng rồi gửi lại." : "Các báo cáo quản đốc không duyệt. Người báo sửa lại trên iPad rồi gửi lại.")) + '</div>';
+  if (!L.length) return h + empty("ok", T("Không có báo cáo nào bị trả lại."));
+  return h + lst(L.map(r => { const x = r.x, lg = r.k === "log";
+    return '<div class="it rjit" onclick="go(\'' + (lg ? "log" : "incident") + '\',{id:\'' + x._id + '\'})"><div class="f">' +
+      '<div class="t1">' + esc(lg ? (x.task || "") : (x.desc || T("Sự cố"))) + '</div>' +
+      '<div class="t2"><span class="code">' + esc(x.devId) + '</span> · ' + esc(x.devName || devName(x.devId)) + ' · ' + esc(T(lg ? "Người làm: {n}" : "Báo: {n}", {n: x.byName || ""})) + '</div>' +
+      '<div class="t2 rjr">✖ ' + esc(T("Lý do: {n}", {n: x.rejNote || ""})) + '</div>' +
+      '<div class="t2">' + esc((x.rejBy || "") + " · " + fmtDT(x.rejAt)) + '</div></div>' +
+      '<div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">' + chip(lg ? "Bảo trì" : "Sự cố", lg ? "g" : "r") + chip("Bị trả lại", "r") + '</div></div>'; }).join(""));
+}};
+
 /* ---- Danh sách sự cố ---- */
 VIEWS.incidents = {wide: true, live: true, title: () => T("Sự cố"), html(){
-  const tab = ["done", "pend"].indexOf(V.p.tab) >= 0 ? V.p.tab : "open";
+  const tab = ["done", "pend", "rej"].indexOf(V.p.tab) >= 0 ? V.p.tab : "open";
+  const rej = Object.values(S.incPend).filter(i => isRej(i) && (isMgr() || isDevice() || i.by === S.user.id || i.fixById === S.user.id)).sort((a, b) => a.rejAt - b.rejAt);
   const pend = Object.values(S.incPend).filter(i => isPend(i) && (isMgr() || isDevice() || i.by === S.user.id || i.fixById === S.user.id)).sort((a, b) => a.fixAt - b.fixAt);
   const open = Object.values(S.incOpen).sort((a, b) => a.at - b.at);   // hỏng lâu nhất lên đầu
   const done = S.incMonth.filter(i => iSt(i) === "done").sort((a, b) => (b.fixAt || b.at) - (a.fixAt || a.at));
   const tb = (k, t, n, red) => '<button class="' + (tab === k ? "on" : "") + '" onclick="go(\'incidents\',{tab:\'' + k + '\'},true)">' + esc(T(t)) + (n ? '<span class="n"' + (red ? "" : ' style="background:#777"') + '>' + n + '</span>' : "") + '</button>';
   let h = isWatcher() ? "" : '<button class="btn r" style="margin-bottom:12px" onclick="go(\'incnew\')">' + ic("plus") + T("Báo sự cố mới") + '</button>';
-  h += '<div class="tabs">' + tb("pend", "Chờ duyệt", pend.length, 1) + tb("open", "Đang hỏng", open.length, 1) + tb("done", "Sửa xong tháng này", done.length) + '</div>';
+  h += '<div class="tabs">' + tb("pend", "Chờ duyệt", pend.length, 1) + (rej.length || tab === "rej" ? tb("rej", "Bị trả lại", rej.length, 1) : "") + tb("open", "Đang hỏng", open.length, 1) + tb("done", "Sửa xong tháng này", done.length) + '</div>';
   if (tab === "open" && open.length) h += '<div class="mu sm" style="margin:-4px 2px 8px">' + esc(T("Lịch bảo trì của máy đang hỏng sẽ tạm ngưng đến khi sửa xong.")) + '</div>';
-  const L = tab === "done" ? done : tab === "pend" ? pend : open;
-  h += L.length ? lst(L.map(incItem).join("")) : empty("ok", tab === "done" ? T("Tháng này chưa có máy nào sửa xong.") : tab === "pend" ? T("Không có báo cáo nào chờ duyệt.") : T("Hiện không có máy nào hỏng."));
+  const L = tab === "done" ? done : tab === "pend" ? pend : tab === "rej" ? rej : open;
+  h += L.length ? lst(L.map(incItem).join("")) : empty("ok", tab === "done" ? T("Tháng này chưa có máy nào sửa xong.") : tab === "rej" ? T("Không có báo cáo nào bị trả lại.") : tab === "pend" ? T("Không có báo cáo nào chờ duyệt.") : T("Hiện không có máy nào hỏng."));
   return h;
 }};
 
@@ -1057,7 +1130,7 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
   }
   const k = iSt(i), s = ISTATUS[k], hist = nextLog(i);
   let h = '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">' + chip(s[0], s[1]) + (k === "open" ? chip(T("{n} ngày", {n: waitDays(i)}), "m") : "") +
-    (isPend(i) ? chip("Chờ duyệt", "a") : (i.apprBy ? chip(T("Đã duyệt"), "g") : "")) + '</div>' +
+    (isPend(i) ? chip("Chờ duyệt", "a") : isRej(i) ? chip("Bị trả lại", "r") : (i.apprBy ? chip(T("Đã duyệt"), "g") : "")) + '</div>' +
     '<div class="b" style="font-size:18px;margin-bottom:8px">' + esc(i.desc || "") + '</div><dl class="info">' +
     '<dt>' + esc(T("Thiết bị")) + '</dt><dd><a href="#" onclick="go(\'device\',{code:\'' + esc(i.devId) + '\'});return false" class="code" style="color:var(--g)">' + esc(i.devId) + '</a> · ' + esc(i.devName || "") + '</dd>' +
     '<dt>' + esc(T("Người báo")) + '</dt><dd><b>' + esc(i.byName) + '</b></dd><dt>' + esc(T("Thời gian báo")) + '</dt><dd>' + esc(fmtDT(i.at)) + '</dd>' +
@@ -1067,13 +1140,14 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
     (i.parts && i.parts.length ? '<dt>' + esc(T("Linh kiện đã thay")) + '</dt><dd>' + esc(i.parts.map(r => r.n + " × " + r.q).join(", ")) + '</dd>' : "") +
     (i.fixAt ? '<dt>' + esc(T("Người sửa xong")) + '</dt><dd><b>' + esc(i.fixBy || "") + '</b></dd><dt>' + esc(T("Xong lúc")) + '</dt><dd>' + esc(fmtDT(i.fixAt)) + '</dd><dt>' + esc(T("Thời gian sửa")) + '</dt><dd>' + esc(fmtDur(i.fixAt - i.at)) + '</dd>' : "") +
     '</dl>' + (i.photos && i.photos.length ? '<div class="phs" id="incph" style="margin-top:12px"></div>' : "") + '</div>';
+  if (isRej(i) || (i.rejLog && i.rejLog.length && isPend(i))) h += rejBox(i);
   // Người báo: sửa lại nội dung báo cáo (trước khi duyệt)
   if (canEditInc(i)){
-    if (k === "done") h += '<div class="hl" style="margin-top:12px">' + esc(T("Báo cáo đang chờ quản đốc duyệt. Bạn vẫn sửa lại được cho đến khi được duyệt.")) + '</div>';
-    h += '<button class="btn w" style="margin-top:12px" onclick="go(\'incnew\',{edit:\'' + i._id + '\'})">' + ic("edit") + T("Sửa nội dung báo cáo") + '</button>';
+    if (isPend(i)) h += '<div class="hl" style="margin-top:12px">' + esc(T("Báo cáo đang chờ quản đốc duyệt. Bạn vẫn sửa lại được cho đến khi được duyệt.")) + '</div>';
+    h += '<button class="btn ' + (isRej(i) ? "y" : "w") + '" style="margin-top:12px" onclick="go(\'incnew\',{edit:\'' + i._id + '\'})">' + ic("edit") + T(isRej(i) ? "SỬA VÀ GỬI LẠI" : "Sửa nội dung báo cáo") + '</button>';
   }
   // Quản đốc: duyệt cuối cùng
-  if (canApprove(i)) h += '<button class="btn y" style="margin-top:12px" onclick="approveInc()">' + ic("ok") + T("DUYỆT BÁO CÁO") + '</button>';
+  if (canApprove(i)) h += '<div class="btns" style="margin-top:12px"><button class="btn y" onclick="approveInc()">' + ic("ok") + T("DUYỆT BÁO CÁO") + '</button><button class="btn rj" onclick="rejPop(\'inc\',\'' + i._id + '\')">✖ ' + esc(T("KHÔNG DUYỆT")) + '</button></div>';
   else if (canUpdInc(i) && i.by !== S.user.id) h += '<div class="hl" style="margin-top:12px">' + esc(T("Máy do {n} báo. Bạn có thể ghi hướng xử lý hoặc sửa tiếp, tên bạn sẽ được lưu lại.", {n: i.byName || ""})) + '</div>';
   // Người báo cập nhật tình trạng: chọn trạng thái, nhập nội dung, một nút Lưu
   if (canUpdInc(i)){
@@ -1099,7 +1173,7 @@ VIEWS.incident = {title: () => T("Chi tiết sự cố"), html(){
 const curInc = () => (F.incCache && F.incCache._id === V.p.id && Date.now() - (F.incCache._fresh || 0) < 5000) ? F.incCache : (S.incPend[V.p.id] || S.incOpen[V.p.id] || S.incMonth.find(x => x._id === V.p.id) || F.incCache);
 /* Danh sách các lần ghi hướng xử lý; dữ liệu cũ chỉ có 1 trường next thì đổi thành 1 dòng */
 const nextLog = i => Array.isArray(i.nextLog) ? i.nextLog : (i.next ? [{t: i.next, by: i.nextBy || "", at: i.nextAt || i.at}] : []);
-const canApproveLog = l => l && l.appr === false && canFinal();
+const canApproveLog = l => l && l.appr === false && !l.rej && canFinal();
 function approveLog(id){
   const l = S.logPend[id] || (F.logCache && F.logCache._id === id ? F.logCache : null); if (!canApproveLog(l)) return;
   const u = {appr: true, apprBy: apprName(), apprById: S.user.id, apprAt: Date.now(), apprMonth: ym(), partsSaved: true};
@@ -1117,14 +1191,14 @@ function apprLogItem(l){
       (l.parts && l.parts.length ? ' · ' + esc(l.parts.map(r => r.n + " × " + r.q).join(", ")) : "") + (l.note ? ' · ' + esc(l.note) : "") + '</div>' +
     '<div class="t2">' + esc(T("Người làm: {n}", {n: l.byName || ""}) + " · " + fmtDT(l.at)) + '</div>' +
     (l.apprAt ? '<div class="t2" style="color:var(--g2);font-weight:600">✔ ' + esc(T("Duyệt: {n}", {n: l.apprBy || ""}) + " · " + fmtDT(l.apprAt)) + '</div>' : "") + '</div>' +
-    (canApproveLog(l) ? '<button class="btn sm" onclick="event.stopPropagation();approveLog(\'' + l._id + '\')">' + ic("ok") + T("Duyệt") + '</button>' : "") + '</div>';
+    (canApproveLog(l) ? apBtns(l, "approveLog") : "") + '</div>';
 }
 /* Chi tiết một lần bảo trì */
 VIEWS.log = {title: () => T("Kết quả bảo trì"), html(){
-  const l = S.logPend[V.p.id] || (F.logCache && F.logCache._id === V.p.id ? F.logCache : null);
+  const l = (F.logCache && F.logCache._id === V.p.id && Date.now() - (F.logCache._fresh || 0) < 5000 ? F.logCache : null) || S.logPend[V.p.id] || S.logRej[V.p.id] || (F.logCache && F.logCache._id === V.p.id ? F.logCache : null);
   if (!l){ R("logs", V.p.id).get().then(s => { if (s.exists){ F.logCache = Object.assign({_id: V.p.id}, s.data()); render(); } }); return '<div class="empty"><div class="spin" style="margin:auto"></div></div>'; }
   let h = '<div class="card"><div class="row" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">' + (l.result === "ng" ? chip("Không đạt", "r") : chip("Đạt", "g")) + (l.late ? chip("Trễ", "r") : "") +
-    (l.appr === false ? chip("Chờ duyệt", "a") : chip(T("Đã duyệt"), "g")) + '</div>' +
+    (isRej(l) ? chip("Bị trả lại", "r") : l.appr === false ? chip("Chờ duyệt", "a") : chip(T("Đã duyệt"), "g")) + '</div>' +
     '<div class="b" style="font-size:18px;margin-bottom:8px">' + esc(l.task || "") + '</div><dl class="info">' +
     '<dt>' + esc(T("Thiết bị")) + '</dt><dd><a href="#" onclick="go(\'device\',{code:\'' + esc(l.devId) + '\'});return false" class="code" style="color:var(--g)">' + esc(l.devId) + '</a> · ' + esc(l.devName || "") + '</dd>' +
     '<dt>' + esc(T("Người làm")) + '</dt><dd><b>' + esc(l.byName || "") + '</b></dd><dt>' + esc(T("Thời gian")) + '</dt><dd>' + esc(fmtDT(l.at)) + '</dd>' +
@@ -1134,9 +1208,48 @@ VIEWS.log = {title: () => T("Kết quả bảo trì"), html(){
     (l.apprBy ? '<dt>' + esc(T("Duyệt")) + '</dt><dd>' + esc(fmtDT(l.apprAt)) + ' · ' + esc(l.apprBy) + '</dd>' : "") + '</dl>' +
     (l.photos && l.photos.length ? '<div class="phs" id="logph" style="margin-top:12px"></div>' : "") + '</div>';
   if ((l.steps || []).length) h += '<h3>' + esc(T("Các bước kiểm tra")) + '</h3><div class="card" style="padding:4px 14px">' + l.steps.map(x => '<div class="nl">' + (x.ok ? "✔ " : "✖ ") + esc(x.t) + '</div>').join("") + '</div>';
-  if (canApproveLog(l)) h += '<button class="btn y" style="margin-top:12px" onclick="approveLog(\'' + l._id + '\')">' + ic("ok") + T("DUYỆT") + '</button>';
+  if (isRej(l) || (l.rejLog && l.rejLog.length && l.appr === false)) h += rejBox(l);
+  if (canApproveLog(l)) h += '<div class="btns" style="margin-top:12px"><button class="btn y" onclick="approveLog(\'' + l._id + '\')">' + ic("ok") + T("DUYỆT") + '</button><button class="btn rj" onclick="rejPop(\'log\',\'' + l._id + '\')">✖ ' + esc(T("KHÔNG DUYỆT")) + '</button></div>';
+  if (isDevice() && isRej(l)) h += logFixForm(l);
   return h;
-}, after(){ const l = S.logPend[V.p.id] || F.logCache; if (l) loadPhotos(l.photos, $("#logph")); }};
+}, after(){ const l = S.logPend[V.p.id] || S.logRej[V.p.id] || F.logCache; if (l) loadPhotos(l.photos, $("#logph")); }};
+/* iPad: sửa lại kết quả bảo trì bị trả lại rồi gửi lại */
+function logFixForm(l){
+  if (F.logFix !== l._id){ F = {logFix: l._id, logCache: F.logCache, res: l.result, note: l.note || "", ck: {}, parts: (l.parts || []).map(r => ({n: r.n, q: r.q}))}; (l.steps || []).forEach((x, i) => F.ck[i] = !!x.ok); PH = []; }
+  const steps = l.steps || [];
+  let h = '<h3>' + esc(T("Sửa và gửi lại")) + '</h3>';
+  if (steps.length) h += '<div class="mu sm" style="margin:-4px 2px 6px">' + esc(T("Các bước kiểm tra")) + ' (<span id="ckn">' + Object.values(F.ck).filter(Boolean).length + '</span>/' + steps.length + ')</div>' +
+    steps.map((x, i) => '<div class="ck ' + (F.ck[i] ? "on" : "") + '" onclick="tick(this,' + i + ')"><span class="bx">' + ic("ok") + '</span><span>' + esc(x.t) + '</span></div>').join("");
+  h += '<div class="lc" style="margin-top:10px"><label class="req">' + esc(T("Kết quả")) + '</label><div class="opts">' +
+    '<button class="opt res ' + (F.res === "ok" ? "on" : "") + '" onclick="setRes(\'ok\')">✔ ' + esc(T("Đạt")) + '</button>' +
+    '<button class="opt res r ' + (F.res === "ng" ? "on" : "") + '" onclick="setRes(\'ng\')">✖ ' + esc(T("Không đạt")) + '</button></div></div>';
+  h += '<div class="lc"><label>' + esc(T("Ghi chú")) + '</label><textarea oninput="F.note=this.value">' + esc(F.note) + '</textarea></div>';
+  h += partsSection();
+  h += '<div class="lc"><label>' + esc(T("Thêm ảnh")) + ' <span class="mu sm">(' + esc(T("không bắt buộc")) + ')</span></label>' + photoBox(Math.max(0, 3 - (l.photos || []).length)) + '</div>';
+  h += actorBox("Người làm", l.by);
+  h += '<button class="btn y" style="margin-top:8px" onclick="saveLogFix()">' + ic("ok") + T("GỬI LẠI") + '</button>';
+  return h;
+}
+function saveLogFix(){
+  const l = S.logRej[V.p.id] || (F.logCache && F.logCache._id === V.p.id ? F.logCache : null);
+  if (!isRej(l)) return;
+  if (!F.res){ toast(T("Chọn kết quả Đạt hoặc Không đạt"), "err"); return; }
+  return asActor(saveLogFix0);
+}
+function saveLogFix0(){
+  const l = S.logRej[V.p.id] || (F.logCache && F.logCache._id === V.p.id ? F.logCache : null);
+  if (!isRej(l)) return;
+  if (me().id !== l.by && me().role !== "leader" && me().role !== "manager"){ toast(T("Chỉ người làm hoặc tổ trưởng mới sửa được báo cáo này."), "err"); return; }
+  const prow = partsRows(); if (!prow) return;
+  const now = Date.now(), pids = savePhotos(l.devId);
+  const u = {steps: (l.steps || []).map((x, i) => ({t: x.t, ok: !!F.ck[i]})), result: F.res, note: (F.note || "").trim(), parts: prow, photos: (l.photos || []).concat(pids),
+    rej: false, resentAt: now, edits: (l.edits || []).concat([{at: now, by: me().name}])};
+  put("logs", l._id, u, true);
+  delete S.logRej[l._id];
+  const lc = Object.assign({}, l, u, {_id: l._id, _fresh: Date.now()});
+  F = {logCache: lc}; PH = [];
+  toast(T("Đã gửi lại, chờ quản đốc duyệt"), "ok"); vib(); render(true);
+}
 const apprFields = i => ({appr: true, apprBy: S.user && S.user.role === "admin" ? "Admin" : me().name, apprById: me().id, apprAt: Date.now(), apprMonth: ym()});
 function approveInc(id){
   const i = id ? curInc0(id) : curInc(); if (!i || !canApprove(i)) return;
@@ -1910,6 +2023,31 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Không duyệt": "非承認",
+"KHÔNG DUYỆT": "非承認",
+"Bị trả lại": "差し戻し",
+"Quản đốc không duyệt": "工場長が非承認",
+"Lý do: {n}": "理由: {n}",
+"Người báo cần sửa lại cho đúng rồi gửi lại.": "報告者が修正して再提出してください。",
+"Đã bị trả lại {n} lần": "差し戻し {n} 回",
+"Trả lại cho người báo để sửa và gửi lại": "報告者に差し戻し、修正・再提出させます",
+"Lý do không duyệt": "非承認の理由",
+"Ví dụ: nhập sai số lượng linh kiện, thiếu ảnh, nội dung sửa chưa rõ…": "例: 部品数量の入力ミス、写真不足、修理内容が不明確…",
+"Trả lại": "差し戻す",
+"Nhập lý do không duyệt": "非承認の理由を入力してください",
+"Đã trả lại cho người báo": "報告者に差し戻しました",
+"{n} báo cáo đã trả lại, đang chờ người báo sửa": "差し戻し {n} 件、報告者の修正待ち",
+"{n} báo cáo của bạn bị trả lại, cần sửa trên iPad": "あなたの報告 {n} 件が差し戻されました。iPadで修正してください",
+"{n} báo cáo bị quản đốc trả lại, cần sửa và gửi lại": "工場長から差し戻された報告 {n} 件。修正して再提出してください",
+"Quản đốc không duyệt các báo cáo dưới đây. Mở từng báo cáo, sửa lại cho đúng rồi gửi lại.": "以下の報告は非承認です。各報告を開き、修正して再提出してください。",
+"Các báo cáo quản đốc không duyệt. Người báo sửa lại trên iPad rồi gửi lại.": "工場長が非承認にした報告です。報告者がiPadで修正して再提出します。",
+"Không có báo cáo nào bị trả lại.": "差し戻しの報告はありません。",
+"SỬA VÀ GỬI LẠI": "修正して再提出",
+"Sửa và gửi lại": "修正して再提出",
+"Đã gửi lại, chờ quản đốc duyệt": "再提出しました。工場長の承認待ち",
+"Thêm ảnh": "写真を追加",
+"GỬI LẠI": "再提出",
+"Chỉ người làm hoặc tổ trưởng mới sửa được báo cáo này.": "実施者または班長のみ修正できます。",
 "Xoá tài khoản này": "このアカウントを削除",
 "Xoá vĩnh viễn tài khoản {n} ({c})? Báo cáo cũ vẫn giữ tên người này.": "アカウント {n}（{c}）を完全に削除しますか？過去の報告の名前は残ります。",
 "Đã xoá tài khoản": "アカウントを削除しました",
