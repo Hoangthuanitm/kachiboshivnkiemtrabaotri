@@ -197,6 +197,7 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .pcx{flex:none;width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer}.pcx svg.i{width:20px;height:20px}
 .pbd{padding:14px 16px;overflow:auto}.pbd .tscroll{margin-bottom:8px}
 td.pdbtn{text-align:right;white-space:nowrap}td.pdbtn .btn.sm{height:34px;padding:0 12px}
+@media (max-width:560px){.phd{flex-wrap:wrap}.phd .f{flex:1 1 calc(100% - 60px)}.phd .pcx{order:1}.phd .pxp{order:2}}
 @media (max-width:759px){.pov{padding:0;align-items:flex-end}.pbox{max-height:88vh;border-radius:16px 16px 0 0}}
 .atbl .ttot{font-weight:800;font-size:15px;color:var(--a);white-space:nowrap}
 .atbl .tres{display:inline-block;border-radius:8px;padding:2px 9px;font-weight:700;font-size:13px;white-space:nowrap}
@@ -281,6 +282,19 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
   body>*:not(#print-area){display:none!important}
   #print-area{display:block!important}
   .lbl{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* In chi tiết linh kiện (popup) */
+  .prep{font:12px/1.35 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans JP",sans-serif;color:#1d2420;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .prep .phd{display:flex;align-items:center;gap:10px;background:var(--g);color:#fff;border-radius:8px;padding:10px 14px;margin-bottom:10px}
+  .prep .phd img{width:34px;height:34px;background:#fff;border-radius:6px;padding:2px}
+  .prep .phd .f{flex:1}.prep .pt{font-weight:800;font-size:18px}.prep .ps{font-size:12px;opacity:.92}.prep .pw{font-size:10.5px;text-align:right;opacity:.92}
+  .prep table{width:100%;border-collapse:collapse}
+  .prep thead{display:table-header-group}.prep tr{break-inside:avoid}
+  .prep th{background:var(--gl);color:var(--g2);text-align:left;font-weight:700;padding:6px 7px;border-bottom:1.5px solid var(--bd)}
+  .prep td{padding:6px 7px;border-bottom:1px solid var(--bd);vertical-align:top}
+  .prep tbody tr:nth-child(even) td{background:#f7f9f7}
+  .prep .c{font-family:ui-monospace,Menlo,monospace;font-weight:700;white-space:nowrap}.prep .n{font-weight:800;text-align:right;white-space:nowrap}.prep .d{font-weight:700;white-space:nowrap}
+  .prep .src{display:inline-block;border-radius:6px;padding:1px 7px;font-weight:700;font-size:11px;white-space:nowrap}.prep .src.r{background:var(--rl);color:var(--r)}.prep .src.g{background:var(--gl);color:var(--g2)}
+  .prep tr.tot td{background:var(--gl)!important;font-weight:800;border-top:1.5px solid var(--g)}
 }
 @media (min-width:700px){.stats{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .h3top{margin-top:18px}
@@ -295,7 +309,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "04/11/2026 15:50";
+const VERSION = "04/11/2026 16:30";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -1677,6 +1691,19 @@ function partCsv(k){
     .concat([["", "", "", "", T("Tổng"), q, "", ""]]));
   toast(T("Đã xuất file"), "ok");
 }
+/* In chi tiết linh kiện: trang A4 có tiêu đề, bảng đầy đủ cột, dòng tổng (Lưu dưới dạng PDF được từ hộp thoại in) */
+function partPrint(k){
+  const P = partList(k); if (!P) return;
+  const q = P.L.reduce((a, x) => a + (+x.qty || 0), 0), nd = new Set(P.L.map(x => x.devId)).size;
+  $("#print-area").innerHTML = '<div class="prep"><div class="phd"><img src="' + LOGO + '"><div class="f"><div class="pt">' + esc(P.name) + '</div><div class="ps">' +
+    esc(T("Tháng {m} · {n} lần thay · {d} máy · Tổng SL {q}", {m: P.m.slice(5) + "/" + P.m.slice(0, 4), n: P.L.length, d: nd, q})) + '</div></div>' +
+    '<div class="pw">KACHIBOSHI VIỆT NAM<br>' + esc(T("In lúc {t}", {t: fmtDT(Date.now())})) + '</div></div>' +
+    '<table><thead><tr>' + ["#", "Ngày", "Mã máy", "Thiết bị", "Nhóm máy", "Khu vực", "SL", "Người thay", "Từ"].map(x => '<th>' + esc(x === "#" ? x : T(x)) + '</th>').join("") + '</tr></thead><tbody>' +
+    P.L.map((x, i) => '<tr><td>' + (i + 1) + '</td><td class="d">' + cDate(x.at) + '</td><td class="c">' + esc(x.devId) + '</td><td>' + esc(x.devName || devName(x.devId)) + '</td><td>' + esc(groupLabel(x) || "–") + '</td><td>' + esc(x.area || "–") + '</td>' +
+      '<td class="n">' + esc(x.qty) + '</td><td>' + esc(x.byName || "") + '</td><td><span class="src ' + (x.src === "log" ? "g" : "r") + '">' + esc(T(x.src === "log" ? "Bảo trì" : "Sự cố")) + '</span></td></tr>').join("") +
+    '<tr class="tot"><td colspan="6">' + esc(T("Tổng")) + '</td><td class="n">' + q + '</td><td colspan="2"></td></tr></tbody></table></div>';
+  setTimeout(() => window.print(), 150);
+}
 function partPop(k){
   const P = partList(k); if (!P) return; const name = P.name, m = P.m, L = P.L;
   const q = L.reduce((a, x) => a + (+x.qty || 0), 0), nd = new Set(L.map(x => x.devId)).size;
@@ -1685,7 +1712,8 @@ function partPop(k){
   ov.onclick = ev => { if (ev.target === ov) closePop(); };
   ov.innerHTML = '<div class="pbox" role="dialog" aria-modal="true"><div class="phd"><div class="f"><div class="pt">' + esc(name) + '</div><div class="ps">' +
     esc(T("Tháng {m} · {n} lần thay · {d} máy · Tổng SL {q}", {m: m.slice(5) + "/" + m.slice(0, 4), n: L.length, d: nd, q: q})) + '</div></div>' +
-    '<button class="pxp" onclick="partCsv(' + k + ')">' + ic("down") + esc(T("Xuất file")) + '</button>' +
+    '<button class="pxp" onclick="partPrint(' + k + ')">' + ic("print") + esc(T("In / PDF")) + '</button>' +
+    '<button class="pxp" onclick="partCsv(' + k + ')">' + ic("down") + esc(T("Excel")) + '</button>' +
     '<button class="pcx" onclick="closePop()" aria-label="' + esc(T("Đóng")) + '">' + ic("x") + '</button></div>' +
     '<div class="pbd"><div class="tscroll"><table class="atbl"><thead><tr><th>' + [T("Ngày"), T("Mã máy"), T("Thiết bị"), T("Nhóm máy"), T("Khu vực"), T("SL"), T("Người thay"), T("Từ")].map(x => esc(x)).join('</th><th>') + '</th></tr></thead><tbody>' +
     L.map(x => '<tr' + (x.srcId ? ' onclick="closePop();go(\'' + (x.src === "log" ? "log" : "incident") + '\',{id:\'' + esc(x.srcId) + '\'})"' : ' style="cursor:default"') + '>' +
@@ -2036,6 +2064,9 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"In / PDF": "印刷 / PDF",
+"In lúc {t}": "印刷日時 {t}",
+"Excel": "Excel",
 "Xuất file": "ファイル出力",
 "Đã xuất file": "ファイルを出力しました",
 "Không duyệt": "非承認",
