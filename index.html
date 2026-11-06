@@ -309,7 +309,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "04/11/2026 16:30";
+const VERSION = "06/11/2026 12:00";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -421,7 +421,7 @@ const ICONS = {
 const ic = (n, cls) => '<svg class="i ' + (cls||"") + '" viewBox="0 0 24 24"><path d="' + ICONS[n] + '"/></svg>';
 
 /* ================== DANH MỤC ================== */
-const ROLES = {admin:"Quản trị", manager:"Quản đốc", leader:"Tổ trưởng", worker:"Công nhân", device:"iPad máy"};
+const ROLES = {admin:"Quản trị", director:"Giám đốc", manager:"Quản đốc", leader:"Tổ trưởng", worker:"Công nhân", device:"iPad máy"};
 const DSTATUS = {ok:["Hoạt động","g","ok"], off:["Ngừng dùng","m","off"]};
 /* Tình trạng sự cố: chỉ 2 trạng thái. Dữ liệu cũ (open/doing/fixing/broken) đều = Đang hỏng */
 const ISTATUS = {open:["Đang hỏng","r"], done:["Đã sửa xong","g"]};
@@ -480,6 +480,8 @@ let PH = [];            // ảnh đang chọn trong form
 let F = {};             // trạng thái tạm của form
 let PENDING_DEV = null; // mã thiết bị từ link QR khi chưa đăng nhập
 const isMgr = () => S.user && (S.user.role === "admin" || S.user.role === "manager");
+const isDirector = () => S.user && S.user.role === "director";
+const isViewer = () => isMgr() || isDirector();   // được xem toàn bộ dữ liệu (Giám đốc chỉ xem)
 const isAdmin = () => S.user && S.user.role === "admin";
 const isDevice = () => S.user && S.user.role === "device";   // tablet dùng chung tại xưởng
 /* Người thực hiện thao tác: trên iPad máy là người đã chọn tên + nhập PIN, còn lại là người đăng nhập */
@@ -518,13 +520,13 @@ function startLive(){
   if (isMgr() || S.user.role === "leader" || isDevice()){
     sub(Q("accounts"), sn => { S.acc = {}; docs("accounts", sn).forEach(d => S.acc[d._id] = d); liveRender(); });
   }
-  if (isMgr()) sub(Q("logs", "month", ym()), sn => { S.logsMonth = docs("logs", sn); liveRender(); });
-  if (isMgr()){   // đã duyệt trong tháng (lịch sử duyệt)
+  if (isViewer()) sub(Q("logs", "month", ym()), sn => { S.logsMonth = docs("logs", sn); liveRender(); });
+  if (isViewer()){   // đã duyệt trong tháng (lịch sử duyệt)
     sub(Q("logs", "apprMonth", ym()), sn => { S.logAppr = docs("logs", sn); liveRender(); });
     sub(Q("incidents", "apprMonth", ym()), sn => { S.incAppr = docs("incidents", sn); liveRender(); });
   }
   if (isDevice()) sub(Q("logs", "rej", true), sn => { S.logRej = {}; docs("logs", sn).forEach(d => S.logRej[d._id] = d); liveRender(); });   // bảo trì bị trả lại: iPad sửa và gửi lại
-  if (isMgr()) sub(Q("logs", "appr", false), sn => { S.logPend = {}; docs("logs", sn).forEach(d => S.logPend[d._id] = d); liveRender(); });   // bảo trì chờ duyệt
+  if (isViewer()) sub(Q("logs", "appr", false), sn => { S.logPend = {}; docs("logs", sn).forEach(d => S.logPend[d._id] = d); liveRender(); });   // bảo trì chờ duyệt
 }
 function stopLive(){ UNSUB.forEach(u => { try { u(); } catch(e){} }); UNSUB = []; }
 let lrT;
@@ -580,9 +582,9 @@ window.addEventListener("popstate", e => {
 function render(keepScroll){
   if (!S.user) return;
   const v = VIEWS[V.view] || VIEWS.home;
-  if (v.mgr && !isMgr()){ V = {view: "home", p: {}}; return render(); }
+  if ((v.mgr && !isViewer()) || (isDirector() && v.noDir)){ V = {view: "home", p: {}}; return render(); }
   const y = window.scrollY;
-  const nav = isMgr() ? NAV_M : NAV_W;
+  const nav = isViewer() ? NAV_M : NAV_W;
   const isRoot = nav.some(n => n[0] === V.view);
   $("#app").innerHTML =
     '<header class="top">' +
@@ -590,7 +592,7 @@ function render(keepScroll){
       '<div class="ttl"><b>' + esc(v.title ? v.title() : T("Bảo trì thiết bị")) + '</b><small>KACHIBOSHI VIỆT NAM</small></div>' +
       '<span class="dot ' + (navigator.onLine ? "" : "off") + '" id="netdot" title="online"></span>' +
       '<button class="hb" onclick="setLang(LANG===\'vi\'?\'ja\':\'vi\')">' + (LANG === "vi" ? "日本語" : "Tiếng Việt") + '</button>' +
-      (isMgr() ? '<button class="hb" onclick="go(\'more\')" aria-label="menu">' + ic("user") + '</button>' : "") +
+      (isViewer() ? '<button class="hb" onclick="go(\'more\')" aria-label="menu">' + ic("user") + '</button>' : "") +
     '</header>' +
     '<main id="main" class="' + (v.wide ? "wide " : "") + "v-" + V.view + '">' + v.html() + '</main>' +
     '<nav class="bn" id="nav"></nav>';
@@ -600,10 +602,10 @@ function render(keepScroll){
 }
 function renderChrome(){
   const n = $("#nav"); if (!n) return;
-  const nav = isMgr() ? NAV_M : NAV_W;
+  const nav = isViewer() ? NAV_M : NAV_W;
   const b = buckets();
   const badge = {tasks: b.over.length, incidents: Object.keys(S.incOpen).length};
-  if (isMgr()) badge.home = b.over.length;
+  if (isViewer()) badge.home = b.over.length;
   n.innerHTML = nav.map(x => '<button class="' + (V.view === x[0] ? "on" : "") + '" onclick="go(\'' + x[0] + '\')">' + ic(x[1]) + esc(T(x[2])) +
     (badge[x[0]] ? '<span class="bd">' + badge[x[0]] + '</span>' : "") + '</button>').join("");
   const d = $("#netdot"); if (d) d.className = "dot " + (navigator.onLine ? "" : "off");
@@ -728,8 +730,8 @@ VIEWS.home = {wide: true, live: true, html(){
   if (!isWatcher()) h += '<button class="btn w" onclick="go(\'incnew\')">' + ic("alert") + T("Báo sự cố") + '</button>';
   const L = b.over.concat(b.today);
   h += '</div><div><h3 class="h3top">' + esc(T("Việc cần làm")) + '</h3>' + (L.length ? L.slice(0, 8).map(planItem).join("") : empty("ok", T("Hôm nay không có việc cần làm.")));
-  // Quản đốc: duyệt ngay dưới Việc cần làm
-  if (isMgr()){
+  // Quản đốc: duyệt ngay dưới Việc cần làm (Giám đốc chỉ xem, không có nút duyệt)
+  if (isViewer()){
     const PL = Object.values(S.logPend).filter(l => l.appr === false && !l.rej).sort((a, b) => a.at - b.at);
     const PI = Object.values(S.incPend).filter(isPend).sort((a, b) => a.fixAt - b.fixAt);
     const tab = F.apTab || (PL.length || !PI.length ? "log" : "inc");
@@ -1103,9 +1105,9 @@ function saveInc0(){
 
 /* ---- Báo cáo bị trả lại (không duyệt) ---- */
 function rejList(){
-  const u = S.user, mine = x => isMgr() || isDevice() || x.by === u.id || x.fixById === u.id;
+  const u = S.user, mine = x => isViewer() || isDevice() || x.by === u.id || x.fixById === u.id;
   const I = Object.values(S.incPend).filter(i => isRej(i) && mine(i)).map(x => ({k: "inc", x}));
-  const L = Object.values(isMgr() ? S.logPend : S.logRej).filter(l => isRej(l) && mine(l)).map(x => ({k: "log", x}));
+  const L = Object.values(isViewer() ? S.logPend : S.logRej).filter(l => isRej(l) && mine(l)).map(x => ({k: "log", x}));
   return I.concat(L).sort((a, b) => (a.x.rejAt || 0) - (b.x.rejAt || 0));
 }
 VIEWS.returned = {wide: true, live: true, title: () => T("Bị trả lại"), html(){
@@ -1124,8 +1126,8 @@ VIEWS.returned = {wide: true, live: true, title: () => T("Bị trả lại"), ht
 /* ---- Danh sách sự cố ---- */
 VIEWS.incidents = {wide: true, live: true, title: () => T("Sự cố"), html(){
   const tab = ["done", "pend", "rej"].indexOf(V.p.tab) >= 0 ? V.p.tab : "open";
-  const rej = Object.values(S.incPend).filter(i => isRej(i) && (isMgr() || isDevice() || i.by === S.user.id || i.fixById === S.user.id)).sort((a, b) => a.rejAt - b.rejAt);
-  const pend = Object.values(S.incPend).filter(i => isPend(i) && (isMgr() || isDevice() || i.by === S.user.id || i.fixById === S.user.id)).sort((a, b) => a.fixAt - b.fixAt);
+  const rej = Object.values(S.incPend).filter(i => isRej(i) && (isViewer() || isDevice() || i.by === S.user.id || i.fixById === S.user.id)).sort((a, b) => a.rejAt - b.rejAt);
+  const pend = Object.values(S.incPend).filter(i => isPend(i) && (isViewer() || isDevice() || i.by === S.user.id || i.fixById === S.user.id)).sort((a, b) => a.fixAt - b.fixAt);
   const open = Object.values(S.incOpen).sort((a, b) => a.at - b.at);   // hỏng lâu nhất lên đầu
   const done = S.incMonth.filter(i => iSt(i) === "done").sort((a, b) => (b.fixAt || b.at) - (a.fixAt || a.at));
   const tb = (k, t, n, red) => '<button class="' + (tab === k ? "on" : "") + '" onclick="go(\'incidents\',{tab:\'' + k + '\'},true)">' + esc(T(t)) + (n ? '<span class="n"' + (red ? "" : ' style="background:#777"') + '>' + n + '</span>' : "") + '</button>';
@@ -1387,7 +1389,7 @@ VIEWS.devices = {wide: true, live: true, mgr: true, title: () => T("Thiết bị
   if (!F.dv){ F = {dv: 1, q: "", area: "", st: "", selMode: false, sel: {}}; }
   const L = filteredDevs();
   let h = '<div class="btns" style="margin-bottom:10px">' + (canEditDev() ? '<button class="btn" onclick="go(\'devform\')">' + ic("plus") + T("Thêm thiết bị") + '</button>' : "") +
-    '<button class="btn w" onclick="F.selMode=!F.selMode;render(true)">' + ic("print") + (F.selMode ? T("Huỷ chọn") : T("In tem QR")) + '</button></div>';
+    (isDirector() ? "" : '<button class="btn w" onclick="F.selMode=!F.selMode;render(true)">' + ic("print") + (F.selMode ? T("Huỷ chọn") : T("In tem QR")) + '</button>') + '</div>';
   h += '<div class="search lc">' + ic("search") + '<input id="dq" placeholder="' + esc(T("Tìm mã hoặc tên máy")) + '" value="' + esc(F.q) + '" oninput="F.q=this.value;drawDevs()"></div>';
   h += '<div class="grid3"><select onchange="F.grp=this.value;drawDevs()"><option value="">' + esc(T("Tất cả nhóm máy")) + '</option>' + (S.cfg.groups || []).map(g => '<option' + (F.grp === g ? " selected" : "") + '>' + esc(g) + '</option>').join("") + '</select><select onchange="F.area=this.value;drawDevs()"><option value="">' + esc(T("Tất cả khu vực")) + '</option>' + areasAll().map(a => '<option' + (F.area === a ? " selected" : "") + '>' + esc(a) + '</option>').join("") + '</select>' +
     '<select onchange="F.st=this.value;drawDevs()"><option value="">' + esc(T("Mọi trạng thái")) + '</option>' + [["ok", "Hoạt động"], ["broken", "Đang hỏng"], ["off", "Ngừng dùng"]].map(([k, v]) => '<option value="' + k + '"' + (F.st === k ? " selected" : "") + '>' + esc(T(v)) + '</option>').join("") + '</select></div>';
@@ -1421,7 +1423,7 @@ function toggleSel(id){ F.sel[id] = !F.sel[id]; if (V.view === "planform") retur
 function selAll(){ const L = filteredDevs(), all = L.every(d => F.sel[d._id]); L.forEach(d => F.sel[d._id] = !all); drawDevs(); $("#selN").textContent = Object.keys(F.sel).filter(k => F.sel[k]).length; }
 function goLabels(){ const codes = Object.keys(F.sel).filter(k => F.sel[k]); if (!codes.length){ toast(T("Chưa chọn thiết bị nào"), "err"); return; } go("labels", {codes}); }
 
-VIEWS.devform = {mgr: true, title: () => V.p.code ? T("Sửa thiết bị") : T("Thêm thiết bị"), html(){
+VIEWS.devform = {mgr: true, noDir: true, title: () => V.p.code ? T("Sửa thiết bị") : T("Thêm thiết bị"), html(){
   if (!canEditDev()) return empty("box", T("Chỉ Quản đốc thêm, sửa thiết bị."));
   const e = V.p.code ? S.dev[V.p.code] : null;
   if (V.p.code && !e) return empty("box", "…");
@@ -1505,7 +1507,7 @@ async function qrSvg(text){
   const q = qrcode(0, "M"); q.addData(unescape(encodeURIComponent(text))); q.make();
   return q.createSvgTag({cellSize: 4, margin: 0, scalable: true});
 }
-VIEWS.labels = {wide: true, mgr: true, title: () => T("In tem QR"), html(){
+VIEWS.labels = {wide: true, mgr: true, noDir: true, title: () => T("In tem QR"), html(){
   F.size = F.size || "s50";
   return '<div class="lc"><label>' + esc(T("Khổ tem")) + '</label><div class="opts">' +
     '<button class="opt ' + (F.size === "s50" ? "on" : "") + '" onclick="F.size=\'s50\';render()">50 × 30 mm</button>' +
@@ -1546,7 +1548,7 @@ VIEWS.plans = {wide: true, live: true, mgr: true, title: () => T("Kế hoạch b
     : empty("cal", T("Chưa có kế hoạch"));
   return h;
 }};
-VIEWS.planform = {mgr: true, title: () => V.p.id ? T("Sửa kế hoạch") : T("Thêm kế hoạch"), html(){
+VIEWS.planform = {mgr: true, noDir: true, title: () => V.p.id ? T("Sửa kế hoạch") : T("Thêm kế hoạch"), html(){
   if (!canEditDev()) return empty("cal", T("Chỉ Quản đốc thêm, sửa kế hoạch."));
   const e = V.p.id ? S.plans[V.p.id] : null;
   if (V.p.id && !e) return empty("cal", "…");
@@ -1729,6 +1731,10 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") closePop(); 
 /* ---- Thêm (menu quản lý) ---- */
 VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
   const m = (icn, t, fn, sub) => '<div class="it" onclick="' + fn + '">' + ic(icn) + '<div class="f"><div class="t1">' + esc(T(t)) + '</div>' + (sub ? '<div class="t2">' + esc(sub) + '</div>' : "") + '</div>' + ic("chev") + '</div>';
+  if (isDirector()) return '<div class="menu">' + userCard() +
+    m("down", "Xuất dữ liệu (Excel/CSV)", "go('export')") +
+    m("globe", "Ngôn ngữ", "setLang(LANG==='vi'?'ja':'vi')", LANG === "vi" ? "Tiếng Việt → 日本語" : "日本語 → Tiếng Việt") +
+    m("out", "Đăng xuất", "logout()") + '</div>' + foot();
   return '<div class="menu">' + userCard() +
     m("users", "Tài khoản", "go('accounts')", T("{n} tài khoản", {n: Object.values(S.acc).filter(a => isAdmin() || a.role === "worker").length})) +
     m("print", "In tem QR", "F={dv:1,q:'',area:'',st:'',selMode:true,sel:{}};go('devices')") +
@@ -1748,7 +1754,7 @@ const foot = () => '<div class="foot">' + esc(T("Phiên bản")) + ' ' + VERSION
 
 /* ---- Tài khoản ---- */
 const canManageAcc = a => isAdmin() || (a && (a.role === "worker" || a.role === "leader" || a.role === "device"));
-VIEWS.accounts = {wide: true, live: true, mgr: true, title: () => T("Tài khoản"), html(){
+VIEWS.accounts = {wide: true, live: true, mgr: true, noDir: true, title: () => T("Tài khoản"), html(){
   const L = Object.values(S.acc).filter(canManageAcc).sort((a, b) => (a.role + a.name) < (b.role + b.name) ? -1 : 1);
   return '<button class="btn" style="margin-bottom:12px" onclick="go(\'accform\')">' + ic("plus") + T("Thêm tài khoản") + '</button>' +
     (isAdmin() ? "" : '<div class="hl">' + esc(T("Quản đốc tạo và sửa được tài khoản Tổ trưởng, Công nhân, iPad máy.")) + '</div>') +
@@ -1756,12 +1762,12 @@ VIEWS.accounts = {wide: true, live: true, mgr: true, title: () => T("Tài khoả
       (a.active === false ? chip("Đã khoá", "m") : chip(ROLES[a.role] || a.role, a.role === "worker" ? "g" : a.role === "leader" ? "o" : a.role === "device" ? "m" : "a")) +
       (isAdmin() && a._id !== S.user.id ? '<button class="accx" title="' + esc(T("Xoá tài khoản này")) + '" onclick="event.stopPropagation();delAcc(\'' + esc(a._id) + '\')">' + ic("x") + '</button>' : "") + '</div>').join(""));
 }};
-VIEWS.accform = {mgr: true, title: () => V.p.id ? T("Sửa tài khoản") : T("Thêm tài khoản"), html(){
+VIEWS.accform = {mgr: true, noDir: true, title: () => V.p.id ? T("Sửa tài khoản") : T("Thêm tài khoản"), html(){
   const e = V.p.id ? S.acc[V.p.id] : null;
   if (V.p.id && !e) return empty("user", "…");
   const a = e || {role: "worker", active: true};
   if (e && !canManageAcc(e)) return empty("user", T("Không có quyền"));
-  const roles = isAdmin() ? ["worker", "leader", "manager", "device", "admin"] : ["worker", "leader", "device"];
+  const roles = isAdmin() ? ["worker", "leader", "manager", "director", "device", "admin"] : ["worker", "leader", "device"];
   F = {form: "acc", role: a.role, active: a.active !== false};
   let h = '';
   h += e ? '<div class="hl">' + esc(T("Mã NV")) + ': <b class="code">' + esc(V.p.id) + '</b></div>'
@@ -1809,7 +1815,7 @@ async function saveAcc(){
 /* ---- Xoá toàn bộ dữ liệu, trừ tài khoản (chỉ Quản trị, mật khẩu 112) ---- */
 const PURGE_PW = "112";
 const PURGE_KINDS = [["devices", "Thiết bị"], ["plans", "Kế hoạch bảo trì"], ["logs", "Nhật ký bảo trì"], ["incidents", "Sự cố"], ["photos", "Ảnh"], ["parts", "Linh kiện đã thay"], ["prodlog", "Lịch sử mã hàng"], ["config", "Danh mục cài đặt (trở về mặc định)"]];
-VIEWS.purge = {mgr: true, title: () => T("Xoá toàn bộ dữ liệu"), html(){
+VIEWS.purge = {mgr: true, noDir: true, title: () => T("Xoá toàn bộ dữ liệu"), html(){
   if (!isAdmin()) return empty("trash", T("Không có quyền"));
   if (!F.pg) F = {pg: 1, plan: null};
   let h = '<div class="hl" style="background:var(--rl);color:var(--r);font-weight:600">' + esc(T("Xoá sạch toàn bộ dữ liệu của app, không khôi phục được. Nên xuất Excel trước khi xoá.")) + '</div>';
@@ -1852,7 +1858,7 @@ async function pgRun(){
 }
 
 /* ---- Cài đặt ---- */
-VIEWS.settings = {mgr: true, title: () => T("Cài đặt danh mục"), html(){
+VIEWS.settings = {mgr: true, noDir: true, title: () => T("Cài đặt danh mục"), html(){
   return '<div class="lc"><label>' + esc(T("Bộ phận (mỗi dòng 1 mục)")) + '</label><textarea id="sdepts" rows="5">' + esc((S.cfg.depts || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Nhóm máy (mỗi dòng 1 mục)")) + '</label><textarea id="sgroups" rows="6">' + esc((S.cfg.groups || []).join("\n")) + '</textarea>' +
       '<div class="mu sm" style="margin-top:4px">' + esc(T("Nhóm \"Máy đan\" sẽ có thêm ô Loại máy: 7G, 8G, 10G, 13G, 15G.")) + '</div></div>' +
@@ -1878,7 +1884,7 @@ VIEWS.export = {mgr: true, title: () => T("Xuất dữ liệu"), html(){
 }};
 function csvDown(name, rows){
   const s = rows.map(r => r.map(v => { v = v == null ? "" : String(v); return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }).join(",")).join("\r\n");
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["﻿" + s], {type: "text/csv;charset=utf-8"})); a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["" + s], {type: "text/csv;charset=utf-8"})); a.download = name; document.body.appendChild(a); a.click(); a.remove();
 }
 async function exp(k){
   const m = $("#xm").value || ym();
@@ -2064,6 +2070,7 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Giám đốc": "社長",
 "In / PDF": "印刷 / PDF",
 "In lúc {t}": "印刷日時 {t}",
 "Excel": "Excel",
