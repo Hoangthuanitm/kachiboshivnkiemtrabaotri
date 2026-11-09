@@ -203,7 +203,7 @@ td.pdbtn{text-align:right;white-space:nowrap}td.pdbtn .btn.sm{height:34px;paddin
 .atbl .tres{display:inline-block;border-radius:8px;padding:2px 9px;font-weight:700;font-size:13px;white-space:nowrap}
 .atbl .tres.g{background:var(--gl);color:var(--g2)}.atbl .tres.r{background:var(--rl);color:var(--r)}.atbl .tres.o{margin-left:4px}
 .atbl .tap{white-space:nowrap;color:var(--g2)}.atbl .tap b{font-weight:700}
-.atbl .tact{text-align:right;white-space:nowrap}.atbl .tact .btn.sm{height:36px;padding:0 12px}
+.atbl .tact{text-align:right;white-space:nowrap}.atbl .tact .btn.sm{display:inline-flex;vertical-align:middle}.atbl .tact .btn.sm{height:36px;padding:0 12px}
 .cnone{color:var(--mu);font-size:14px;padding:10px 4px 12px}
 @media (min-width:1000px){.crow .cc{display:flex;align-items:baseline;gap:14px}.crow .c1{flex:1 1 auto;min-width:0}.crow .c2{flex:0 1 auto;max-width:48%}}
 .accx{flex:none;width:40px;height:40px;border-radius:10px;border:1.5px solid #f0b9b9;background:#fff;color:var(--r);display:flex;align-items:center;justify-content:center;cursor:pointer;margin-left:2px}.accx:active{background:var(--rl)}.accx svg.i{width:20px;height:20px;stroke-width:2.6}
@@ -320,7 +320,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "09/11/2026 11:15";
+const VERSION = "09/11/2026 14:45";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -879,13 +879,83 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
     drawHist();
   }).catch(e => { ["#hist", "#phist", "#chist"].forEach(id => { const el = $(id); if (el) el.innerHTML = empty("clock", T("Không tải được lịch sử")); }); });
 }};
+/* Quản đốc / admin sửa hoặc xoá 1 lần nhập sản lượng (ví dụ dữ liệu nhập thử). Xoá phải nhập mã PIN / mật khẩu của chính mình.
+   Sau khi sửa / xoá: tính lại sản lượng các lần nhập sau đó và số mới nhất của máy. */
+const cntGet = id => (F.chist || []).find(x => x._id === id);
+function cntPopShell(title, red, body){
+  closePop();
+  const ov = document.createElement("div"); ov.className = "pov"; ov.id = "pov"; ov.onclick = ev => { if (ev.target === ov) closePop(); };
+  ov.innerHTML = '<div class="pbox sm" role="dialog" aria-modal="true"><div class="phd' + (red ? " r" : "") + '"><div class="f"><div class="pt">' + esc(title) + '</div></div>' +
+    '<button class="pcx" onclick="closePop()" aria-label="' + esc(T("Đóng")) + '">' + ic("x") + '</button></div><div class="pbd">' + body + '</div></div>';
+  document.body.appendChild(ov); document.body.style.overflow = "hidden";
+}
+const cntInfo = x => '<div class="rjinfo"><span class="code">' + esc(x.devId) + '</span> · ' + esc(x.devName || devName(x.devId)) + '<br>' + esc(T("Thời gian nhập")) + ': <b>' + esc(fmtDT(x.at)) + '</b> · ' + esc(x.byName || "") +
+  '<br>' + esc(T("Số trên máy")) + ': <b>' + fmtN(x.val) + '</b> ' + esc(T("chiếc")) + (x.diff !== null && x.diff !== undefined ? ' · ' + esc(T("Sản lượng")) + ': <b>' + esc(pcsText(x.diff)) + '</b>' : "") + '</div>';
+function cntEdPop(id){
+  const x = cntGet(id); if (!x || !isMgr()) return;
+  const P = S.cfg.products || [], cur = x.product || "", opts = P.concat(cur && P.indexOf(cur) < 0 ? [cur] : []);
+  cntPopShell(T("Sửa lần nhập sản lượng"), false, cntInfo(x) +
+    '<div class="lc"><label class="req">' + esc(T("Số trên máy (chiếc)")) + '</label><input id="ced_v" type="number" min="0" step="1" inputmode="numeric" value="' + esc(x.val) + '" style="font-size:22px;font-weight:800;text-align:right"></div>' +
+    '<div class="lc"><label>' + esc(T("Tên sản phẩm")) + '</label><select id="ced_p"><option value="">' + esc(T("Không có mã hàng")) + '</option>' + opts.map(o => '<option' + (o === cur ? " selected" : "") + '>' + esc(o) + '</option>').join("") + '</select></div>' +
+    '<div class="mu sm" style="margin-bottom:10px">' + esc(T("Sản lượng của lần này và lần nhập kế tiếp sẽ được tính lại.")) + '</div>' +
+    '<div class="btns"><button class="btn w" onclick="closePop()">' + esc(T("Huỷ")) + '</button><button class="btn" onclick="cntEdGo(\'' + id + '\')">' + ic("ok") + esc(T("Lưu")) + '</button></div>');
+  setTimeout(() => { const i = $("#ced_v"); if (i) i.focus(); }, 30);
+}
+function cntEdGo(id){
+  const x = cntGet(id); if (!x || !isMgr()) return;
+  const v = String(($("#ced_v") || {}).value || "").trim(), n = Number(v), pr = ($("#ced_p") || {}).value || "";
+  if (!v || !Number.isInteger(n) || n < 0){ toast(T("Số không hợp lệ"), "err"); return; }
+  if (n === x.val && pr === (x.product || "")){ closePop(); return; }
+  const now = Date.now();
+  put("cnt", id, {val: n, product: pr, editBy: apprName(), editById: S.user.id, editAt: now, edits: (x.edits || []).concat([{at: now, by: apprName(), val: x.val, product: x.product || ""}])}, true);
+  Object.assign(x, {val: n, product: pr, editBy: apprName(), editAt: now});
+  cntRecalc(x.devId); closePop(); toast(T("Đã sửa lần nhập sản lượng"), "ok"); drawHist(); if (V.view === "device") render(true);
+}
+function cntDelPop(id){
+  const x = cntGet(id); if (!x || !isMgr()) return;
+  cntPopShell(T("Xoá lần nhập sản lượng"), true, cntInfo(x) +
+    '<div class="lc"><label class="req">' + esc(T("Mã PIN / mật khẩu của {n}", {n: S.user.name})) + '</label><input id="cdel_pw" type="password" autocomplete="off" onkeydown="if(event.key===\'Enter\')cntDelGo(\'' + id + '\')"></div>' +
+    '<div class="alert" id="cdel_err" style="display:none;color:var(--r);font-weight:700;margin:-4px 0 10px"></div>' +
+    '<div class="btns"><button class="btn w" onclick="closePop()">' + esc(T("Huỷ")) + '</button><button class="btn r" onclick="cntDelGo(\'' + id + '\')">' + ic("trash") + esc(T("Xoá")) + '</button></div>');
+  setTimeout(() => { const i = $("#cdel_pw"); if (i) i.focus(); }, 30);
+}
+let CNT_FAIL = 0, CNT_LOCK = 0;
+async function cntDelGo(id){
+  const x = cntGet(id); if (!x || !isMgr()) return;
+  const err = m => { const e = $("#cdel_err"); if (e){ e.textContent = m; e.style.display = "block"; } toast(m, "err"); };
+  const pw = String(($("#cdel_pw") || {}).value || "").trim(), a = S.acc[S.user.id];
+  if (!pw) return err(T("Hãy nhập mã PIN / mật khẩu."));
+  if (Date.now() < CNT_LOCK) return err(T("Nhập sai nhiều lần. Chờ 1 phút rồi thử lại."));
+  let ok = false; try { ok = !!a && !!a.salt && !!a.hash && await sha256(a.salt + ":" + pw) === a.hash; } catch(e){}
+  if (!ok){ if (++CNT_FAIL >= 5){ CNT_FAIL = 0; CNT_LOCK = Date.now() + 60000; } const i = $("#cdel_pw"); if (i){ i.value = ""; i.focus(); } return err(T("Sai mã PIN / mật khẩu.")); }
+  CNT_FAIL = 0;
+  try { await withTimeout(R("cnt", id).delete(), 15000); }
+  catch(e){ return err(T(e && e.code === "permission-denied" ? "Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules." : "Chưa xoá được. Kiểm tra mạng rồi thử lại.")); }
+  F.chist = (F.chist || []).filter(y => y._id !== id);
+  cntRecalc(x.devId); closePop(); toast(T("Đã xoá lần nhập sản lượng"), "ok"); drawHist(); if (V.view === "device") render(true);
+}
+/* Tính lại chuỗi sản lượng của 1 máy (từ cũ đến mới) và số mới nhất trên máy */
+function cntRecalc(c){
+  const L = (F.chist || []).filter(x => x.devId === c).sort((a, b) => a.at - b.at);
+  let prev = null;
+  L.forEach(x => {
+    const reset = !!prev && x.val < prev.val, diff = prev ? (reset ? x.val : x.val - prev.val) : null, span = prev ? x.at - prev.at : null;
+    const u = {prevVal: prev ? prev.val : null, prevAt: prev ? prev.at : null, diff, span, reset};
+    if (u.diff !== x.diff || u.span !== x.span || u.prevVal !== x.prevVal || !!u.reset !== !!x.reset){ put("cnt", x._id, u, true); Object.assign(x, u); }
+    prev = x;
+  });
+  const last = L[L.length - 1], d = S.dev[c]; if (!d) return;
+  const u = last ? {cntVal: last.val, cntAt: last.at, cntBy: last.byName || "", cntDiff: last.diff, cntSpan: last.span} : {cntVal: null, cntAt: null, cntBy: "", cntDiff: null, cntSpan: null};
+  put("devices", c, u, true); S.dev[c] = Object.assign({}, d, u);
+  F.chist = (F.chist || []).slice().sort((a, b) => b.at - a.at);
+}
 function drawHist(){
   const ce = $("#chist"), C = F.chist || [];
-  if (ce) ce.innerHTML = C.length ? '<div class="tscroll"><table class="atbl"><thead><tr><th>' + [T("Thời gian nhập"), T("Số trên máy (chiếc)"), T("Sản lượng"), T("Khoảng thời gian"), T("Người nhập")].map(esc).join('</th><th>') + '</th></tr></thead><tbody>' +
-    C.slice(0, 20).map(x => '<tr style="cursor:default"><td class="tdt">' + esc(fmtDT(x.at)) + '</td><td class="thm">' + fmtN(x.val) + '</td>' +
-      '<td>' + (x.diff === null || x.diff === undefined ? '<span class="mu">' + esc(T("Lần nhập đầu tiên")) + '</span>' : '<b>' + esc(pcsText(x.diff)) + '</b><br><span class="mu sm">' + fmtN(x.diff) + ' ' + esc(T("chiếc")) + (x.reset ? ' · ' + esc(T("đặt lại bộ đếm")) : "") +
-        (x.span && Math.abs(x.span - 86400000) > 3600000 ? ' · ≈ ' + esc(pcsText(per24(x.diff, x.span))) + ' / 24' + esc(T(" giờ")) : "") + '</span>') + '</td>' +
-      '<td class="sm">' + (x.span ? esc(spanText(x.span)) : "–") + '</td><td class="tnm">' + esc(x.byName || "") + '</td></tr>').join("") + '</tbody></table></div>'
+  if (ce) ce.innerHTML = C.length ? '<div class="tscroll"><table class="atbl"><thead><tr><th>' + [T("Thời gian nhập"), T("Tên sản phẩm"), T("Số trên máy (chiếc)"), T("Sản lượng (tá – đôi)"), T("Khoảng thời gian"), T("Người nhập")].concat(isMgr() ? [""] : []).map(esc).join('</th><th>') + '</th></tr></thead><tbody>' +
+    C.slice(0, 20).map(x => '<tr style="cursor:default"><td class="tdt">' + esc(fmtDT(x.at)) + '</td><td class="ttx">' + (x.product ? esc(x.product) : '<span class="mu">' + esc(T("Không có mã hàng")) + '</span>') + '</td><td class="thm">' + fmtN(x.val) + '</td>' +
+      '<td>' + (x.diff === null || x.diff === undefined ? '<span class="mu">' + esc(T("Lần nhập đầu tiên")) + '</span>' : '<b>' + esc(pcsText(x.diff)) + '</b>' + (x.reset ? '<br><span class="mu sm">' + esc(T("đặt lại bộ đếm")) + '</span>' : "")) + '</td>' +
+      '<td class="sm">' + (x.span ? esc(spanText(x.span)) : "–") + '</td><td class="tnm">' + esc(x.byName || "") + (x.editBy ? '<br><span class="mu sm">' + esc(T("Sửa: {n}", {n: x.editBy})) + '</span>' : "") + '</td>' +
+      (isMgr() ? '<td class="tact"><button class="btn sm w" onclick="cntEdPop(\'' + x._id + '\')" aria-label="' + esc(T("Sửa")) + '" title="' + esc(T("Sửa")) + '">' + ic("edit") + '</button> <button class="btn sm w" style="color:var(--r)" onclick="cntDelPop(\'' + x._id + '\')" aria-label="' + esc(T("Xoá")) + '" title="' + esc(T("Xoá")) + '">' + ic("trash") + '</button></td>' : "") + '</tr>').join("") + '</tbody></table></div>'
     : '<div class="cnone">' + esc(T("Chưa có lần nhập sản lượng nào.")) + '</div>';
   // linh kiện đã thay của máy: tổng theo loại + các lần thay gần nhất
   const pe = $("#phist"), P = F.phist || [];
@@ -1397,7 +1467,7 @@ function cntBand(d){
   if (!d.cntAt) return "";
   const old = Date.now() - d.cntAt > 36 * 3600000;
   if (d.cntDiff === null || d.cntDiff === undefined) return '<div class="cntband' + (old ? " old" : "") + '"><small>' + esc(T("Số trên máy")) + '</small><b>' + fmtN(d.cntVal) + ' ' + esc(T("chiếc")) + '</b><span>' + esc(fmtDT(d.cntAt)) + '</span></div>';
-  return '<div class="cntband' + (old ? " old" : "") + '"><small>' + esc(T("Sản lượng 1 ngày")) + '</small><b>' + esc(pcsText(d.cntDiff)) + '</b><span>' + fmtN(d.cntDiff) + ' ' + esc(T("chiếc")) + ' · ' + esc(spanText(d.cntSpan || 0)) + ' · ' + esc(fmtDT(d.cntAt)) + '</span></div>';
+  return '<div class="cntband' + (old ? " old" : "") + '"><small>' + esc(T("Sản lượng 1 ngày")) + '</small><b>' + esc(pcsText(d.cntDiff)) + '</b><span>' + esc(spanText(d.cntSpan || 0)) + ' · ' + esc(fmtDT(d.cntAt)) + '</span></div>';
 }
 /* Xem trước sản lượng khi đang nhập số trên máy */
 function cntPrevTxt(d, v){
@@ -2226,6 +2296,19 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Sửa: {n}": "修正：{n}",
+"Sửa lần nhập sản lượng": "生産量入力の修正",
+"Xoá lần nhập sản lượng": "生産量入力の削除",
+"Sản lượng của lần này và lần nhập kế tiếp sẽ được tính lại.": "この回と次回の生産量が再計算されます。",
+"Mã PIN / mật khẩu của {n}": "{n} のPIN／パスワード",
+"Hãy nhập mã PIN / mật khẩu.": "PIN／パスワードを入力してください。",
+"Nhập sai nhiều lần. Chờ 1 phút rồi thử lại.": "入力ミスが続きました。1分後に再試行してください。",
+"Sai mã PIN / mật khẩu.": "PIN／パスワードが違います。",
+"Chưa xoá được. Kiểm tra mạng rồi thử lại.": "削除できませんでした。通信を確認して再試行してください。",
+"Đã xoá lần nhập sản lượng": "生産量の入力を削除しました",
+"Đã sửa lần nhập sản lượng": "生産量の入力を修正しました",
+"Tên sản phẩm": "製品名",
+"Sản lượng (tá – đôi)": "生産量（打・双）",
 "Quét QR cập nhật sản lượng": "QRを読み取って生産量を更新",
 "Tài khoản này chỉ được xem.": "このアカウントは閲覧のみです。",
 "Đã lưu số {n} chiếc lúc {t}.": "{t} に {n} 枚を保存しました。",
