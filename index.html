@@ -1041,11 +1041,11 @@ function partsBox(){
     '<datalist id="dl_parts">' + (S.cfg.parts || []).map(p => '<option value="' + esc(p) + '">').join("") + '</datalist></div>';
 }
 function refreshParts(){ const e = $("#partsbox"); if (e) e.outerHTML = partsBox(); refreshRec(); const ins = document.querySelectorAll("#partsbox .pn"); if (ins.length) ins[ins.length - 1].focus(); }
-const partsSection = rec => '<div class="lc"><label>' + esc(T("Linh kiện đã thay")) + ' <span class="mu sm">(' + esc(T("nếu có")) + ')</span></label>' + partsBox() + '</div>' + (rec ? recBox() : "");
+const partsSection = rec => '<div class="lc"><label' + (rec ? ' class="req"' : "") + '>' + esc(T("Linh kiện đã thay")) + (rec ? "" : ' <span class="mu sm">(' + esc(T("nếu có")) + ')</span>') + '</label>' + partsBox() + '</div>' + (rec ? recBox() : "");
 /* Linh kiện hỏng (báo cáo sự cố): mỗi linh kiện đã thay có 1 dòng linh kiện cũ thu hồi — đã tìm đủ / chưa đủ bộ phận + ảnh */
 function recBox(){
   const L = (F.parts || []).map((r, i) => [r, i]).filter(([r]) => String(r.n || "").trim());
-  if (!L.length) return '<div id="recbox"></div>';
+  if (!L.length) return '<div id="recbox" class="lc"><label class="req">' + esc(T("Linh kiện hỏng")) + '</label><div class="hl" style="margin:0">' + esc(T("Thêm linh kiện đã thay ở trên, rồi chọn Đã tìm đủ hoặc Chưa đủ bộ phận cho từng linh kiện.")) + '</div></div>';
   return '<div id="recbox" class="lc"><label class="req">' + esc(T("Linh kiện hỏng")) + ' <span class="mu sm">(' + esc(T("linh kiện cũ thu hồi sau khi thay")) + ')</span></label>' +
     L.map(([r, i]) => '<div class="recrow"><div class="recn"><b>' + esc(String(r.n).trim()) + '</b> <span class="mu">× ' + esc(r.q) + '</span></div>' +
       '<div class="opts"><button class="opt' + (r.rec === "ok" ? " on" : "") + '" onclick="setRec(' + i + ',\'ok\')">✔ ' + esc(T("Đã tìm đủ bộ phận")) + '</button>' +
@@ -1198,6 +1198,7 @@ function saveInc0(){
   const fix = F.st === "done" ? (F.fix || "").trim() : "";
   if (F.st === "done" && !fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
   const prow0 = F.st === "done" ? partsRows(true) : []; if (!prow0) return;
+  if (F.st === "done" && !prow0.length){ toast(T("Nhập ít nhất 1 linh kiện đã thay, rồi chọn Đã tìm đủ hoặc Chưa đủ bộ phận"), "err"); const b = $("#partsbox"); if (b) b.scrollIntoView({block: "center"}); return; }
   const now = Date.now(), pids = savePhotos(F.code), prow = savePartPh(prow0, F.code);
   if (F.edit){   // lưu bản sửa của người báo
     const i = curInc0(F.edit);
@@ -1422,6 +1423,7 @@ function saveIncUpd0(){
     const fix = (F.fix || "").trim();
     if (!fix){ toast(T("Nhập nội dung đã sửa như thế nào"), "err"); return; }
     const prow0 = partsRows(true); if (!prow0) return;
+    if (!prow0.length){ toast(T("Nhập ít nhất 1 linh kiện đã thay, rồi chọn Đã tìm đủ hoặc Chưa đủ bộ phận"), "err"); const b = $("#partsbox"); if (b) b.scrollIntoView({block: "center"}); return; }
     const prow = savePartPh(prow0, i.devId);
     const u = {status: "done", open: false, fix, fixAt: now, fixBy: me().name, fixById: me().id, parts: prow, partsSaved: false, appr: false};
     if (autoAppr()){ Object.assign(u, apprFields(i), {partsSaved: true}); saveParts(prow, i.devId, "inc", i._id); }   // quản đốc tự sửa: tự duyệt
@@ -2296,6 +2298,8 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Nhập ít nhất 1 linh kiện đã thay, rồi chọn Đã tìm đủ hoặc Chưa đủ bộ phận": "交換した部品を1つ以上入力し、「部品をすべて回収」または「部品が不足」を選んでください",
+"Thêm linh kiện đã thay ở trên, rồi chọn Đã tìm đủ hoặc Chưa đủ bộ phận cho từng linh kiện.": "上で交換部品を追加し、各部品について「部品をすべて回収」または「部品が不足」を選んでください。",
 "Sửa: {n}": "修正：{n}",
 "Sửa lần nhập sản lượng": "生産量入力の修正",
 "Xoá lần nhập sản lượng": "生産量入力の削除",
