@@ -189,6 +189,7 @@ table.t td,table.t th{border-bottom:1px solid var(--bd);padding:8px 6px;text-ali
 .atbl .ttx{min-width:150px;font-weight:500}
 .atbl .thm{font-weight:800;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .atbl .tnm{font-weight:600;white-space:nowrap}
+.atbl .tphc{white-space:nowrap}.tth{width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid var(--bd);background:#e9ece9;margin:1px 4px 1px 0;vertical-align:middle;cursor:zoom-in}
 .atbl .tpart{min-width:130px;font-size:13.5px;font-weight:500;line-height:1.35}.atbl .tpart div+div{margin-top:2px}.atbl .tpart b{font-weight:800;white-space:nowrap}
 .pov{position:fixed;inset:0;z-index:70;background:rgba(20,30,24,.45);display:flex;align-items:center;justify-content:center;padding:16px}
 .pbox{background:#fff;border-radius:16px;width:100%;max-width:860px;max-height:calc(100vh - 32px);display:flex;flex-direction:column;box-shadow:0 18px 50px rgba(0,0,0,.25);overflow:hidden}
@@ -220,6 +221,7 @@ td.pdbtn{text-align:right;white-space:nowrap}td.pdbtn .btn.sm{height:34px;paddin
 .recrow .recn{grid-column:1/-1;font-size:16px}.recrow .opts{min-width:0}.recrow .opt{min-height:48px;font-size:15px}
 .recrow .opt.on{border-color:var(--g);background:var(--gl);color:var(--g2)}.recrow .opt.r.on{border-color:var(--r);background:var(--rl);color:var(--r)}
 .recrow .ph,.recrow .phadd{width:84px;height:84px}
+.phadd.req{border-color:var(--r);color:var(--r)}.phadd small{font-size:11px;font-weight:600;opacity:.85}
 .recd{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:2px 0 6px}.recd .ph{width:64px;height:64px}
 .rchip{display:inline-block;border-radius:8px;padding:1px 8px;font-size:12.5px;font-weight:700;white-space:nowrap}.rchip.g{background:var(--gl);color:var(--g2)}.rchip.r{background:var(--rl);color:var(--r)}
 .cntband{background:#e6f0fb;color:#173a63;padding:5px 12px 6px;border-top:1px solid #cfe0f3}
@@ -227,6 +229,7 @@ td.pdbtn{text-align:right;white-space:nowrap}td.pdbtn .btn.sm{height:34px;paddin
 .cntband.old{background:#f1f2f1;color:var(--mu);border-top-color:var(--bd)}
 @media (max-width:600px){.ctbl{min-width:0!important}.ctbl thead{display:none}.ctbl tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--bd)}.ctbl td{display:block;border:0!important;padding:0!important}.ctbl td.tdev{grid-column:1/-1}.ctbl td:last-child{grid-column:1/-1}.ctbl input{width:100%!important}}
 .ctbl td{vertical-align:middle}.ctbl input{width:130px;min-height:46px;font-size:17px;text-align:right}.ctbl .cp{font-size:13px;font-weight:600;color:#173a63;white-space:nowrap}.ctbl .cp.r{color:var(--r)}
+.kimc{margin-top:12px}.kimc .stats{margin-bottom:8px}
 .prodband{background:var(--y);color:#2a2a00;padding:6px 12px 7px;display:flex;flex-direction:column;justify-content:center;min-height:52px}
 .prodband small{font-size:11px;font-weight:600;opacity:.75;line-height:1.2}
 .prodband b{font-size:16px;line-height:1.2;letter-spacing:.2px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -320,7 +323,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "09/11/2026 14:45";
+const VERSION = "12/11/2026 11:40";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -790,8 +793,19 @@ function tblLog(L, done){
       '<td class="thm">' + cHM(l.at) + '</td><td class="tnm">' + esc(sName(l.byName)) + '</td>' +
       (done ? tAppr(l) : '<td class="tact">' + tSt(l, canApproveLog(l), "approveLog") + '</td>') + '</tr>').join("") + '</tbody></table></div>';
 }
+/* Ảnh nhỏ trong bảng: tải 1 lần rồi giữ trong bộ nhớ, bấm để phóng to */
+const PHC = {};
+const phThumb = (id, cap) => '<img class="tth" data-ph="' + esc(id) + '" alt="' + esc(cap || "") + '" title="' + esc(cap || "") + '"' + (PHC[id] ? ' src="' + PHC[id] + '"' : "") + ' onclick="event.stopPropagation();if(this.src)zoom(this.src)">';
+function fillPh(){
+  document.querySelectorAll("img.tth[data-ph]").forEach(im => {
+    const id = im.dataset.ph; if (PHC[id]){ if (!im.getAttribute("src")) im.src = PHC[id]; return; }
+    if (PHC[id] === null) return; PHC[id] = null;
+    R("photos", id).get().then(sn => { if (sn.exists){ PHC[id] = sn.data().data; document.querySelectorAll('img.tth[data-ph="' + id + '"]').forEach(x => x.src = PHC[id]); } else delete PHC[id]; }).catch(() => { delete PHC[id]; });
+  });
+}
 function tblInc(L, done){
-  const th = ["Ngày", "Tên máy", "Người báo", "Giờ báo", "Người sửa", "Giờ xong", "Tổng thời gian sửa", "Linh kiện đã thay", done ? "Người duyệt" : ""];
+  const th = ["Ngày", "Tên máy", "Người báo", "Giờ báo", "Người sửa", "Giờ xong", "Tổng thời gian sửa", "Linh kiện đã thay", "Hình ảnh", done ? "Người duyệt" : ""];
+  setTimeout(fillPh, 0);
   return '<div class="tscroll"><table class="atbl"><thead><tr>' + th.map(x => '<th>' + esc(x ? T(x) : "") + '</th>').join("") + '</tr></thead><tbody>' +
     L.map(i => '<tr onclick="go(\'incident\',{id:\'' + i._id + '\'})" title="' + esc((i.desc || "") + (i.fix ? " → " + i.fix : "")) + '">' +
       '<td class="tdt">' + cDate(i.at) + '</td>' + tDev(i.devId) +
@@ -799,6 +813,7 @@ function tblInc(L, done){
       '<td class="tnm">' + esc(sName(i.fixBy || i.byName)) + '</td><td class="thm">' + cHM(i.fixAt) + (i.fixAt && cDate(i.fixAt) !== cDate(i.at) ? '<small>' + esc(cDate(i.fixAt).slice(0, 5)) + '</small>' : "") + '</td>' +
       '<td class="ttot">' + (i.fixAt ? esc(fmtDur(i.fixAt - i.at)) : "") + '</td>' +
       '<td class="tpart">' + (i.parts && i.parts.length ? i.parts.map(r => '<div>' + esc(r.n) + ' <b>× ' + esc(r.q) + '</b> ' + recChip(r) + '</div>').join("") : '<span class="mu">–</span>') + '</td>' +
+      '<td class="tphc">' + ((i.parts || []).some(r => r.phId) ? (i.parts || []).filter(r => r.phId).map(r => phThumb(r.phId, r.n)).join("") : '<span class="mu">–</span>') + '</td>' +
       (done ? tAppr(i) : '<td class="tact">' + tSt(i, canApprove(i), "approveInc") + '</td>') + '</tr>').join("") + '</tbody></table></div>';
 }
 function cLogRow(l){
@@ -1052,7 +1067,7 @@ function recBox(){
       '<button class="opt r' + (r.rec === "miss" ? " on" : "") + '" onclick="setRec(' + i + ',\'miss\')">✖ ' + esc(T("Chưa đủ bộ phận")) + '</button></div>' +
       '<div>' + (r.ph ? '<div class="ph"><img src="' + r.ph + '" onclick="zoom(this.src)"><button class="x" onclick="F.parts[' + i + '].ph=null;refreshRec()">' + ic("x") + '</button></div>'
         : r.phId ? '<div class="ph" id="rph_' + i + '"><div class="phload">…</div><button class="x" onclick="F.parts[' + i + '].phId=\'\';refreshRec()">' + ic("x") + '</button></div>'
-        : '<label class="phadd">' + ic("cam") + esc(T("Chụp ảnh")) + '<input type="file" accept="image/*" capture="environment" style="display:none" onchange="addRecPh(this,' + i + ')"></label>') + '</div></div>').join("") + '</div>';
+        : '<label class="phadd req">' + ic("cam") + esc(T("Chụp ảnh")) + '<small>' + esc(T("bắt buộc")) + '</small><input type="file" accept="image/*" capture="environment" style="display:none" onchange="addRecPh(this,' + i + ')"></label>') + '</div></div>').join("") + '</div>';
 }
 function refreshRec(){
   const e = $("#recbox"); if (!e) return; e.outerHTML = recBox();
@@ -1080,6 +1095,7 @@ function partsRows(rec){
     if (!n) continue;
     if (!Number.isInteger(q) || q < 1){ toast(T("Số lượng linh kiện \"{n}\" không hợp lệ", {n}), "err"); return null; }
     if (rec && !r.rec){ toast(T("Linh kiện hỏng \"{n}\": chọn Đã tìm đủ hoặc Chưa đủ bộ phận", {n}), "err"); const b = $("#recbox"); if (b) b.scrollIntoView({block: "center"}); return null; }
+    if (rec && !r.ph && !r.phId){ toast(T("Linh kiện hỏng \"{n}\": chụp ảnh linh kiện đã thu hồi", {n}), "err"); const b = $("#recbox"); if (b) b.scrollIntoView({block: "center"}); return null; }
     if (rec){ out.push({n, q, rec: r.rec, _ph: r.ph || null, phId: r.phId || ""}); continue; }
     out.push({n, q});
   }
@@ -1852,6 +1868,44 @@ VIEWS.report = {wide: true, mgr: true, title: () => T("Báo cáo"), html(){
   if (F.repM !== m || V.view !== "report") return;
   drawReport(m, ms);
 }};
+/* Quản lý kim: kim đã thay trong tháng (từ báo cáo sự cố) và kim cũ thu hồi.
+   Đã tìm đủ bộ phận = phục hồi được; Chưa đủ bộ phận = không phục hồi được. */
+const isKimPart = n => /(^|\s)kim(\s|$)/i.test(String(n || "").normalize("NFC").trim());
+function kimCard(inc){
+  const rows = [];
+  inc.filter(i => iSt(i) === "done").forEach(i => (i.parts || []).filter(r => isKimPart(r.n)).forEach(r => rows.push({i, r, q: +r.q || 0, ok: r.rec === "ok"})));
+  F.kimRows = rows;
+  const sum = f => rows.filter(f).reduce((a, x) => a + x.q, 0);
+  const tot = sum(() => true), ok = sum(x => x.ok), miss = tot - ok, rate = tot ? Math.round(miss * 1000 / tot) / 10 : null;   // chưa ghi nhận thu hồi = không phục hồi được
+  let h = '<div class="card kimc"><div class="b" style="margin-bottom:8px">' + esc(T("Quản lý kim")) + '</div>';
+  if (!rows.length) return h + '<div class="mu sm">' + esc(T("Tháng này chưa thay kim nào.")) + '</div></div>';
+  h += '<div class="stats">' + stat(tot, T("Số lượng kim thay")) + stat(ok, T("Phục hồi được"), "var(--g)") + stat(miss, T("Không phục hồi được"), miss ? "var(--r)" : "") +
+    stat(rate === null ? "–" : rate + "%", T("Tỷ lệ không phục hồi"), miss ? "var(--r)" : "var(--g)") + '</div>';
+  const g = {}; rows.forEach(x => { const d = S.dev[x.i.devId], k = (d ? groupLabel(d) : "") || T("(Chưa phân nhóm)"), o = g[k] = g[k] || {t: 0, ok: 0}; o.t += x.q; if (x.ok) o.ok += x.q; });
+  const L = F.kimGrp = Object.entries(g).sort((a, b) => b[1].t - a[1].t);
+  h += '<div class="scroll" style="margin-top:6px"><table class="t"><thead><tr><th>' + esc(T("Loại máy")) + '</th><th class="n">' + esc(T("Kim thay")) + '</th><th class="n">' + esc(T("Phục hồi được")) + '</th><th class="n">' + esc(T("Không phục hồi")) + '</th><th></th><th class="n">' + esc(T("Tỷ lệ không phục hồi")) + '</th></tr></thead><tbody>' +
+    L.map(([k, o], n) => { const ms = o.t - o.ok; return '<tr><td>' + esc(k) + '</td><td class="n"><b>' + o.t + '</b></td><td class="n" style="color:var(--g2)">' + o.ok + '</td><td class="n"' + (ms ? ' style="color:var(--r);font-weight:700"' : "") + '>' + ms + '</td>' +
+      '<td class="pdbtn">' + (ms ? '<button class="btn sm w" onclick="kimPop(' + n + ')">' + esc(T("Chi tiết")) + '</button>' : "") + '</td><td class="n">' + (o.t ? Math.round(ms * 1000 / o.t) / 10 + "%" : "–") + '</td></tr>'; }).join("") + '</tbody></table></div>';
+  return h + '</div>';
+}
+/* Popup: lịch sử kim không phục hồi được của 1 loại máy (giống popup chi tiết linh kiện) */
+function kimPop(n){
+  const e = (F.kimGrp || [])[n]; if (!e) return; const key = e[0], m = F.repM;
+  const L = (F.kimRows || []).filter(x => !x.ok && (((S.dev[x.i.devId] ? groupLabel(S.dev[x.i.devId]) : "") || T("(Chưa phân nhóm)")) === key)).sort((a, b) => (b.i.fixAt || b.i.at) - (a.i.fixAt || a.i.at));
+  const q = L.reduce((a, x) => a + x.q, 0), nd = new Set(L.map(x => x.i.devId)).size;
+  closePop();
+  const ov = document.createElement("div"); ov.className = "pov"; ov.id = "pov"; ov.onclick = ev => { if (ev.target === ov) closePop(); };
+  ov.innerHTML = '<div class="pbox" role="dialog" aria-modal="true"><div class="phd r"><div class="f"><div class="pt">' + esc(T("Kim không phục hồi được")) + ' · ' + esc(key) + '</div><div class="ps">' +
+    esc(T("Tháng {m} · {n} lần thay · {d} máy · Tổng SL {q}", {m: m.slice(5) + "/" + m.slice(0, 4), n: L.length, d: nd, q})) + '</div></div>' +
+    '<button class="pcx" onclick="closePop()" aria-label="' + esc(T("Đóng")) + '">' + ic("x") + '</button></div>' +
+    '<div class="pbd"><div class="tscroll"><table class="atbl"><thead><tr><th>' + [T("Ngày"), T("Mã máy"), T("Thiết bị"), T("Loại kim"), T("SL"), T("Người sửa"), T("Thu hồi"), T("Hình ảnh")].map(x => esc(x)).join('</th><th>') + '</th></tr></thead><tbody>' +
+    L.map(x => '<tr onclick="closePop();go(\'incident\',{id:\'' + esc(x.i._id) + '\'})"><td class="tdt">' + cDate(x.i.fixAt || x.i.at) + '</td><td><span class="code">' + esc(x.i.devId) + '</span></td><td class="ttx">' + esc(x.i.devName || devName(x.i.devId)) + '</td>' +
+      '<td>' + esc(x.r.n) + '</td><td class="thm">' + x.q + '</td><td class="tnm">' + esc(sName(x.i.fixBy || x.i.byName)) + '</td>' +
+      '<td>' + (x.r.rec === "miss" ? recChip(x.r) : '<span class="rchip r">' + esc(T("Chưa ghi nhận")) + '</span>') + '</td>' +
+      '<td class="tphc">' + (x.r.phId ? phThumb(x.r.phId, x.r.n) : '<span class="mu">–</span>') + '</td></tr>').join("") +
+    '</tbody></table></div><div class="mu sm">' + esc(T("Bấm vào một dòng để mở báo cáo sự cố gốc. \"Chưa ghi nhận\": báo cáo trước khi có mục Linh kiện hỏng, tính là không phục hồi được.")) + '</div></div></div>';
+  document.body.appendChild(ov); document.body.style.overflow = "hidden"; setTimeout(fillPh, 0);
+}
 function drawReport(m, ms){
   const el = $("#rep"); if (!el) return;
   const logs = F.repCache["l" + m] || [], inc = F.repCache["i" + m] || [], now = Date.now();
@@ -1899,6 +1953,7 @@ function drawReport(m, ms){
     (parts.length ? '<div class="scroll"><table class="t"><thead><tr><th>' + esc(T("Linh kiện")) + '</th><th>' + esc(T("Theo nhóm máy")) + '</th><th class="n">' + esc(T("Số máy")) + '</th><th class="n">' + esc(T("Tổng SL")) + '</th><th></th></tr></thead><tbody>' +
       (F.repPN = Object.entries(pt).sort((a, b) => b[1].q - a[1].q)).map(([n, o], k) => '<tr><td><b>' + esc(n) + '</b></td><td class="sm">' + Object.entries(o.by).sort((a, b) => b[1] - a[1]).map(([g, q]) => esc(g) + ': <b>' + q + '</b>').join(" · ") + '</td><td class="n">' + o.dev.size + '</td><td class="n"><b>' + o.q + '</b></td><td class="pdbtn"><button class="btn sm w" onclick="partPop(' + k + ')">' + esc(T("Chi tiết")) + '</button></td></tr>').join("") + '</tbody></table></div>'
       : '<div class="mu sm">' + esc(T("Tháng này chưa ghi linh kiện nào.")) + '</div>') + '</div>';
+  h += kimCard(inc);
   h += '<div class="btns"><button class="btn w" onclick="exp(\'log\')">' + ic("down") + T("Xuất nhật ký bảo trì") + '</button><button class="btn w" onclick="exp(\'inc\')">' + ic("down") + T("Xuất sự cố") + '</button><button class="btn w" onclick="exp(\'part\')">' + ic("down") + T("Xuất linh kiện") + '</button></div>';
   h += '<div class="mu sm" style="margin-top:10px">' + esc(T("Thời gian hỏng tính từ lúc báo sự cố đến lúc bấm \"Đã sửa xong\"; sự cố chưa xong tính đến hiện tại. Số liệu tháng tính theo sự cố được báo trong tháng.")) + '</div>';
   el.innerHTML = h;
@@ -2298,6 +2353,27 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Không phục hồi được": "回収できなかった",
+"Thu hồi": "回収",
+"Chưa ghi nhận": "未記録",
+"Bấm vào một dòng để mở báo cáo sự cố gốc. \"Chưa ghi nhận\": báo cáo trước khi có mục Linh kiện hỏng, tính là không phục hồi được.": "行をタップすると元の故障報告を開きます。「未記録」：故障部品欄の追加前の報告で、未回収として計算。",
+"bắt buộc": "必須",
+"Linh kiện hỏng \"{n}\": chụp ảnh linh kiện đã thu hồi": "故障部品「{n}」：回収した部品の写真を撮ってください",
+"Hình ảnh": "写真",
+"Quản lý kim": "針の管理",
+"Kim thay khi sửa máy (báo cáo sự cố) trong tháng": "当月の修理（故障報告）で交換した針",
+"Tháng này chưa thay kim nào.": "今月は針の交換がありません。",
+"Số lượng kim thay": "交換した針の数",
+"Kim phục hồi được": "回収できた針",
+"Kim không phục hồi được": "回収できなかった針",
+"Tỷ lệ không phục hồi được": "未回収率",
+"{n} kim chưa ghi nhận thu hồi (báo cáo trước khi có mục Linh kiện hỏng), không tính vào tỷ lệ.": "{n} 本は回収状況が未記録（故障部品欄の追加前の報告）のため、率に含めていません。",
+"Kim thay": "交換",
+"Phục hồi được": "回収",
+"Không phục hồi": "未回収",
+"Tỷ lệ không phục hồi": "未回収率",
+"Loại kim": "針の種類",
+"Các lần kim không phục hồi được ({n})": "針が回収できなかった件（{n}）",
 "Nhập ít nhất 1 linh kiện đã thay, rồi chọn Đã tìm đủ hoặc Chưa đủ bộ phận": "交換した部品を1つ以上入力し、「部品をすべて回収」または「部品が不足」を選んでください",
 "Thêm linh kiện đã thay ở trên, rồi chọn Đã tìm đủ hoặc Chưa đủ bộ phận cho từng linh kiện.": "上で交換部品を追加し、各部品について「部品をすべて回収」または「部品が不足」を選んでください。",
 "Sửa: {n}": "修正：{n}",
