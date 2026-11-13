@@ -230,6 +230,7 @@ td.pdbtn{text-align:right;white-space:nowrap}td.pdbtn .btn.sm{height:34px;paddin
 @media (max-width:600px){.ctbl{min-width:0!important}.ctbl thead{display:none}.ctbl tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:4px 10px;padding:8px 10px;border-bottom:1px solid var(--bd)}.ctbl td{display:block;border:0!important;padding:0!important}.ctbl td.tdev{grid-column:1/-1}.ctbl td:last-child{grid-column:1/-1}.ctbl input{width:100%!important}}
 .ctbl td{vertical-align:middle}.ctbl input{width:130px;min-height:46px;font-size:17px;text-align:right}.ctbl .cp{font-size:13px;font-weight:600;color:#173a63;white-space:nowrap}.ctbl .cp.r{color:var(--r)}
 .kimc{margin-top:12px}.kimc .stats{margin-bottom:8px}
+.dact{display:flex;gap:6px;padding:0 10px 10px}.dact .btn.sm{flex:1 1 0;min-height:38px;font-size:14px;padding:0 6px}.dact .btn.sm svg.i{width:16px;height:16px}
 .prodband{background:var(--y);color:#2a2a00;padding:6px 12px 7px;display:flex;flex-direction:column;justify-content:center;min-height:52px}
 .prodband small{font-size:11px;font-weight:600;opacity:.75;line-height:1.2}
 .prodband b{font-size:16px;line-height:1.2;letter-spacing:.2px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -323,7 +324,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "12/11/2026 11:40";
+const VERSION = "13/11/2026 11:50";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -646,7 +647,8 @@ function devItem(d, sel){
    - Quản đốc duyệt cuối cùng, sau khi đã sửa xong. Báo cáo của chính quản đốc tự duyệt khi sửa xong.
    - Quản trị không báo, không cập nhật; được duyệt thay quản đốc (người duyệt ghi là Admin). */
 const isWatcher = () => S.user && !isDevice();   // chỉ iPad máy mới báo sự cố, ghi bảo trì; các tài khoản khác chỉ xem
-const canEditDev = () => S.user && S.user.role === "manager";   // thêm/sửa máy, kế hoạch: chỉ quản đốc
+const canEditDev = () => S.user && S.user.role === "manager";
+const canManageDev = () => S.user && (S.user.role === "manager" || S.user.role === "admin");   // sửa / xoá thiết bị: quản đốc, admin   // thêm/sửa máy, kế hoạch: chỉ quản đốc
 const isLocked = i => i.appr === true || (i.appr === undefined && iSt(i) === "done");   // dữ liệu cũ đã xong = coi như đã duyệt
 const isPend = i => iSt(i) === "done" && i.appr === false && !i.rej;                              // đã sửa xong, chờ quản đốc duyệt
 const canEditInc = i => isDevice() && !isLocked(i);   // iPad: kiểm tra người làm khi lưu   // người báo, hoặc người đã sửa xong (trước khi duyệt)
@@ -873,7 +875,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
     '</dl></div>';
   h += '<div class="btns" style="margin-bottom:6px">' + (isWatcher() ? "" : incs.length ? '<button class="btn y" onclick="go(\'incident\',{id:\'' + openIncOf(c)._id + '\'})">' + ic("edit") + T("Cập nhật tình trạng") + '</button>'
       : '<button class="btn r" onclick="go(\'incnew\',{code:\'' + c + '\'})">' + ic("alert") + T("Báo sự cố") + '</button>') +
-    (canEditDev() ? '<button class="btn w" onclick="go(\'devform\',{code:\'' + c + '\'})">' + ic("edit") + T("Sửa") + '</button>' : "") + '</div>';
+    (canManageDev() ? '<button class="btn w" onclick="go(\'devform\',{code:\'' + c + '\'})">' + ic("edit") + T("Sửa") + '</button><button class="btn w" style="color:var(--r)" onclick="devDelPop(\'' + c + '\')">' + ic("trash") + T("Xoá") + '</button>' : "") + '</div>';
   if (isKnit(d.group) && canCnt()) h += '<button class="btn gh" style="margin-bottom:6px" onclick="go(\'cntone\',{code:\'' + c + '\'})">' + ic("chart") + T("Cập nhật sản lượng máy này") + '</button>';
   if (incs.length) h += '<h3>' + esc(T("Sự cố chưa xong")) + '</h3>' + incs.map(incItem).join("");
   h += '<h3>' + esc(T("Kế hoạch bảo trì")) + '</h3>' + (plans.length ? plans.map(p => planItem(p)).join("") : empty("cal", T("Chưa có kế hoạch")));
@@ -1628,7 +1630,7 @@ function saveProd(clear, list){
 VIEWS.devices = {wide: true, live: true, mgr: true, title: () => T("Thiết bị"), html(){
   if (!F.dv){ F = {dv: 1, q: "", area: "", st: "", selMode: false, sel: {}}; }
   const L = filteredDevs();
-  let h = '<div class="btns" style="margin-bottom:10px">' + (canEditDev() ? '<button class="btn" onclick="go(\'devform\')">' + ic("plus") + T("Thêm thiết bị") + '</button>' : "") +
+  let h = '<div class="btns" style="margin-bottom:10px">' + (canManageDev() ? '<button class="btn" onclick="go(\'devform\')">' + ic("plus") + T("Thêm thiết bị") + '</button>' : "") +
     (isDirector() ? "" : '<button class="btn w" onclick="F.selMode=!F.selMode;render(true)">' + ic("print") + (F.selMode ? T("Huỷ chọn") : T("In tem QR")) + '</button>') + '</div>';
   h += '<div class="search lc">' + ic("search") + '<input id="dq" placeholder="' + esc(T("Tìm mã hoặc tên máy")) + '" value="' + esc(F.q) + '" oninput="F.q=this.value;drawDevs()"></div>';
   h += '<div class="grid3"><select onchange="F.grp=this.value;drawDevs()"><option value="">' + esc(T("Tất cả nhóm máy")) + '</option>' + (S.cfg.groups || []).map(g => '<option' + (F.grp === g ? " selected" : "") + '>' + esc(g) + '</option>').join("") + '</select><select onchange="F.area=this.value;drawDevs()"><option value="">' + esc(T("Tất cả khu vực")) + '</option>' + areasAll().map(a => '<option' + (F.area === a ? " selected" : "") + '>' + esc(a) + '</option>').join("") + '</select>' +
@@ -1657,14 +1659,46 @@ function devTile(d, sel){
     '<span class="dst">' + chip(s[0], s[1]) + '</span>' +
     '<div class="pic"><i class="mimg"></i></div>' +
     '<div class="dtb"><div class="code dcd">' + esc(d._id) + '</div><div class="dnm">' + esc(d.name || "") + '</div>' +
-    '<div class="dmeta">' + esc([groupLabel(d), d.area].filter(Boolean).join(" · ")) + '</div></div></div>';
+    '<div class="dmeta">' + esc([groupLabel(d), d.area].filter(Boolean).join(" · ")) + '</div></div>' +
+    (!sel && V.view === "devices" && canManageDev() ? '<div class="dact"><button class="btn sm w" onclick="event.stopPropagation();go(\'devform\',{code:\'' + d._id + '\'})">' + ic("edit") + esc(T("Sửa")) + '</button>' +
+      '<button class="btn sm w" style="color:var(--r)" onclick="event.stopPropagation();devDelPop(\'' + d._id + '\')" aria-label="' + esc(T("Xoá")) + '">' + ic("trash") + esc(T("Xoá")) + '</button></div>' : "") + '</div>';
+}
+/* Xoá thiết bị (quản đốc / admin): nhập mã PIN / mật khẩu của chính mình. Xoá luôn kế hoạch bảo trì của máy; lịch sử sự cố, bảo trì, linh kiện vẫn giữ. */
+function devDelPop(c){
+  const d = S.dev[c]; if (!d || !canManageDev()) return;
+  const np = Object.values(S.plans).filter(p => p.devId === c).length, open = Object.values(S.incOpen).some(i => i.devId === c);
+  cntPopShell(T("Xoá thiết bị"), true, '<div class="rjinfo"><span class="code">' + esc(c) + '</span> · <b>' + esc(d.name || "") + '</b><br>' + esc([groupLabel(d), d.area].filter(Boolean).join(" · ")) + '</div>' +
+    '<div class="hl" style="margin-bottom:10px">' + esc(T("Máy sẽ bị xoá khỏi danh sách thiết bị" + (np ? " cùng {n} kế hoạch bảo trì của máy." : "."), {n: np})) + ' ' + esc(T("Lịch sử sự cố, bảo trì và linh kiện đã thay vẫn được giữ trong báo cáo.")) +
+      (open ? '<br><b style="color:var(--r)">' + esc(T("Máy đang có sự cố chưa sửa xong.")) + '</b>' : "") + '<br>' + esc(T("Nếu máy chỉ tạm ngưng, nên dùng Sửa → Ngừng sử dụng thay vì xoá.")) + '</div>' +
+    '<div class="lc"><label class="req">' + esc(T("Mã PIN / mật khẩu của {n}", {n: S.user.name})) + '</label><input id="ddel_pw" type="password" autocomplete="off" onkeydown="if(event.key===\'Enter\')devDelGo(\'' + c + '\')"></div>' +
+    '<div class="alert" id="ddel_err" style="display:none;color:var(--r);font-weight:700;margin:-4px 0 10px"></div>' +
+    '<div class="btns"><button class="btn w" onclick="closePop()">' + esc(T("Huỷ")) + '</button><button class="btn r" onclick="devDelGo(\'' + c + '\')">' + ic("trash") + esc(T("Xoá thiết bị")) + '</button></div>');
+  setTimeout(() => { const i = $("#ddel_pw"); if (i) i.focus(); }, 30);
+}
+async function devDelGo(c){
+  const d = S.dev[c]; if (!d || !canManageDev()) return;
+  const err = m => { const e = $("#ddel_err"); if (e){ e.textContent = m; e.style.display = "block"; } toast(m, "err"); };
+  const pw = String(($("#ddel_pw") || {}).value || "").trim(), a = S.acc[S.user.id];
+  if (!pw) return err(T("Hãy nhập mã PIN / mật khẩu."));
+  if (Date.now() < CNT_LOCK) return err(T("Nhập sai nhiều lần. Chờ 1 phút rồi thử lại."));
+  let ok = false; try { ok = !!a && !!a.salt && !!a.hash && await sha256(a.salt + ":" + pw) === a.hash; } catch(e){}
+  if (!ok){ if (++CNT_FAIL >= 5){ CNT_FAIL = 0; CNT_LOCK = Date.now() + 60000; } const i = $("#ddel_pw"); if (i){ i.value = ""; i.focus(); } return err(T("Sai mã PIN / mật khẩu.")); }
+  CNT_FAIL = 0; busy(true);
+  try {
+    const plans = Object.values(S.plans).filter(p => p.devId === c);
+    await withTimeout(Promise.all([R("devices", c).delete()].concat(plans.map(p => R("plans", p._id).delete()))), 15000);
+    delete S.dev[c]; plans.forEach(p => delete S.plans[p._id]);
+    closePop(); toast(T("Đã xoá thiết bị {c}", {c}), "ok");
+    if (V.view === "devices") render(true); else go("devices", {}, true);
+  } catch(e){ err(T(e && e.code === "permission-denied" ? "Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules." : "Chưa xoá được. Kiểm tra mạng rồi thử lại.")); }
+  finally { busy(false); }
 }
 function toggleSel(id){ F.sel[id] = !F.sel[id]; if (V.view === "planform") return drawPf(); drawDevs(); $("#selN").textContent = Object.keys(F.sel).filter(k => F.sel[k]).length; }
 function selAll(){ const L = filteredDevs(), all = L.every(d => F.sel[d._id]); L.forEach(d => F.sel[d._id] = !all); drawDevs(); $("#selN").textContent = Object.keys(F.sel).filter(k => F.sel[k]).length; }
 function goLabels(){ const codes = Object.keys(F.sel).filter(k => F.sel[k]); if (!codes.length){ toast(T("Chưa chọn thiết bị nào"), "err"); return; } go("labels", {codes}); }
 
 VIEWS.devform = {mgr: true, noDir: true, title: () => V.p.code ? T("Sửa thiết bị") : T("Thêm thiết bị"), html(){
-  if (!canEditDev()) return empty("box", T("Chỉ Quản đốc thêm, sửa thiết bị."));
+  if (!canManageDev()) return empty("box", T("Chỉ Quản đốc hoặc Admin thêm, sửa thiết bị."));
   const e = V.p.code ? S.dev[V.p.code] : null;
   if (V.p.code && !e) return empty("box", "…");
   const d = e || {status: "ok"};
@@ -2353,6 +2387,14 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Chỉ Quản đốc hoặc Admin thêm, sửa thiết bị.": "設備の追加・編集は工場長またはAdminのみです。",
+"Xoá thiết bị": "設備を削除",
+"Máy sẽ bị xoá khỏi danh sách thiết bị cùng {n} kế hoạch bảo trì của máy.": "設備一覧から削除され、この設備の保全計画 {n} 件も削除されます。",
+"Máy sẽ bị xoá khỏi danh sách thiết bị.": "設備一覧から削除されます。",
+"Lịch sử sự cố, bảo trì và linh kiện đã thay vẫn được giữ trong báo cáo.": "故障・保全・交換部品の履歴はレポートに残ります。",
+"Máy đang có sự cố chưa sửa xong.": "この設備には未修理の故障があります。",
+"Nếu máy chỉ tạm ngưng, nên dùng Sửa → Ngừng sử dụng thay vì xoá.": "一時停止の場合は、削除ではなく「編集 → 使用停止」を使ってください。",
+"Đã xoá thiết bị {c}": "設備 {c} を削除しました",
 "Không phục hồi được": "回収できなかった",
 "Thu hồi": "回収",
 "Chưa ghi nhận": "未記録",
