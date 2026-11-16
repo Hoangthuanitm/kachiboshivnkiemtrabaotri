@@ -324,7 +324,7 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "13/11/2026 11:50";
+const VERSION = "16/11/2026 08:40";
 const COLLECTION = "kachiboshibaotrithietbi";
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
@@ -466,14 +466,14 @@ const dChip = d => { const x = devState(d); return chip(x[0], x[1]); };
 
 /* ================== FIRESTORE ================== */
 /* Mọi dữ liệu nằm trong 1 collection; mỗi tài liệu có trường type và id dạng {tiền tố}_{khoá} */
-const TYPES = {accounts:"acc", devices:"dev", plans:"plan", logs:"log", incidents:"inc", photos:"photo", config:"config", parts:"part", prodlog:"prod", cnt:"cnt"};
+const TYPES = {accounts:"acc", devices:"dev", plans:"plan", logs:"log", incidents:"inc", photos:"photo", config:"config", parts:"part", prodlog:"prod", cnt:"cnt", tomb:"del"};
 let FS, COL;
 const R = (c, id) => COL.doc(TYPES[c] + "_" + id);
 function Q(c, f, v){ let q = COL.where("type", "==", TYPES[c]); if (f) q = q.where(f, "==", v); return q; }
 const docs = (c, sn) => sn.docs.filter(d => d.id.indexOf(TYPES[c] + "_") === 0).map(d => Object.assign({_id: d.id.slice(TYPES[c].length + 1)}, d.data()));
 /* Ghi không chờ server (để chạy được khi mất mạng); lỗi sẽ báo sau */
 function put(c, id, data, merge){
-  const d = Object.assign({type: TYPES[c], updatedAt: Date.now()}, data);
+  const d = c === "photos" ? Object.assign({type: TYPES[c]}, data) : Object.assign({type: TYPES[c], updatedAt: Date.now()}, data);
   const p = merge ? R(c, id).set(d, {merge: true}) : R(c, id).set(d);
   p.catch(onErr);
   return p;
@@ -523,7 +523,87 @@ async function getActor(){
 }
 async function asActor(fn){ const a = await getActor(); if (!a) return; ACT = a; try { await fn(); } finally { ACT = null; F.actId = ""; F.actPin = ""; const x = $("#actPin"); if (x) x.value = ""; } }
 
+/* ================== ĐỒNG BỘ TIẾT KIỆM LƯỢT ĐỌC ==================
+   Trước đây: mỗi lần mở app, mỗi máy đọc lại toàn bộ thiết bị, kế hoạch, tài khoản, sự cố, nhật ký… (vài trăm lượt đọc / lần mở).
+   Nay: dữ liệu được lưu trên máy (localStorage). Lần mở sau chỉ đọc các bản ghi THAY ĐỔI kể từ lần trước (trường updatedAt),
+   bằng 1 truy vấn duy nhất. Bản ghi bị xoá được báo qua "bia mộ" (type "del"). Tải lại toàn bộ khi: lần đầu, quá 7 ngày, admin dọn dữ liệu,
+   hoặc người dùng bấm "Tải lại toàn bộ dữ liệu". */
+const CKEY = "kb_cache_v1_" + COLLECTION, SYNC_MARGIN = 2 * 3600000, FULL_EVERY = 7 * 86400000;
+const KEEP_T = new Set(["dev", "plan", "acc", "inc", "log", "config", "part"]);
+let DB0 = {}, SYNC = {last: 0, full: 0, epoch: 0}, svT;
+const prevYm = () => { const [y, m] = ym().split("-").map(Number); return m === 1 ? (y - 1) + "-12" : y + "-" + String(m - 1).padStart(2, "0"); };
+function cacheLoad(){ try { const o = JSON.parse(localStorage.getItem(CKEY) || "null"); if (o && o.db && o.sync){ DB0 = o.db; SYNC = o.sync; return true; } } catch(e){} DB0 = {}; SYNC = {last: 0, full: 0, epoch: 0}; return false; }
+function cachePrune(){ const pm = prevYm();
+  Object.keys(DB0).forEach(k => { const d = DB0[k];
+    if (d.type === "inc" || d.type === "log"){ if (!((d.month || "") >= pm || (d.apprMonth || "") >= pm || d.open === true || d.appr === false || d.rej === true)) delete DB0[k]; }
+    else if (d.type === "part"){ if (!((d.month || "") >= pm)) delete DB0[k]; }
+    else if (d.type === "plan" && d.active === false) delete DB0[k]; }); }
+function cacheSave(){ clearTimeout(svT); svT = setTimeout(() => { cachePrune(); try { localStorage.setItem(CKEY, JSON.stringify({db: DB0, sync: SYNC})); } catch(e){ try { localStorage.removeItem(CKEY); } catch(e2){} } }, 800); }
+function cacheClear(){ DB0 = {}; SYNC = {last: 0, full: 0, epoch: 0}; try { localStorage.removeItem(CKEY); } catch(e){} }
+/* Dựng lại các danh sách S.* từ bộ nhớ đệm (giống các truy vấn cũ) */
+function rebuild(){
+  const L = {}; Object.keys(DB0).forEach(k => { const d = DB0[k], t = d.type, p = t + "_"; if (k.indexOf(p) !== 0) return; (L[t] = L[t] || []).push(Object.assign({_id: k.slice(p.length)}, d)); });
+  const m = ym(), map = a => { const o = {}; a.forEach(x => o[x._id] = x); return o; };
+  const inc = L.inc || [], log = L.log || [];
+  S.dev = map(L.dev || []); S.plans = map((L.plan || []).filter(x => x.active === true)); S.acc = map(L.acc || []);
+  S.cfg = Object.assign({}, DEF_CFG, (L.config || []).find(x => x._id === "main") || {});
+  S.incOpen = map(inc.filter(x => x.open === true)); S.incMonth = inc.filter(x => x.month === m); S.incPend = map(inc.filter(x => x.appr === false));
+  S.incAppr = inc.filter(x => x.apprMonth === m); S.logsMonth = log.filter(x => x.month === m); S.logAppr = log.filter(x => x.apprMonth === m);
+  S.logPend = map(log.filter(x => x.appr === false)); S.logRej = map(log.filter(x => x.rej === true));
+  S.loaded.dev = 1; S.loaded.plans = 1;
+  liveRender();
+}
+let rbT; const rebuildSoon = () => { clearTimeout(rbT); rbT = setTimeout(rebuild, 40); };
+/* Tải toàn bộ (lần đầu / định kỳ): chỉ các truy vấn app thực sự cần */
+async function fullLoad(){
+  const m = ym(), qs = [Q("devices"), Q("plans", "active", true), Q("accounts"), Q("incidents", "open", true), Q("incidents", "appr", false),
+    Q("incidents", "month", m), Q("incidents", "apprMonth", m), Q("logs", "appr", false), Q("logs", "rej", true),
+    Q("logs", "month", m), Q("logs", "apprMonth", m), Q("parts", "month", m)];
+  const res = await Promise.all(qs.map(q => q.get()).concat([R("config", "main").get()]));
+  const db = {}; let mx = 0;
+  res.slice(0, -1).forEach(sn => sn.docs.forEach(d => { const x = d.data(); db[d.id] = x; if (+x.updatedAt > mx) mx = +x.updatedAt; }));
+  const cf = res[res.length - 1]; if (cf.exists){ const x = cf.data(); db[TYPES.config + "_main"] = x; if (+x.updatedAt > mx) mx = +x.updatedAt; }
+  DB0 = db; SYNC = {last: Math.max(mx, Date.now() - SYNC_MARGIN), full: Date.now(), fm: m, epoch: (db[TYPES.config + "_main"] || {}).cacheEpoch || 0};
+  cacheSave(); rebuild();
+}
+/* Luồng theo dõi thay đổi: 1 truy vấn updatedAt > (lần đồng bộ trước − 2 giờ dự phòng lệch giờ máy) */
+function deltaListen(){
+  const since = Math.max(0, (SYNC.last || Date.now()) - SYNC_MARGIN);
+  UNSUB.push(COL.where("updatedAt", ">", since).onSnapshot(sn => {
+    let ch = false, reset = false;
+    sn.docChanges().forEach(c => {
+      if (c.type === "removed") return;
+      const id = c.doc.id, x = c.doc.data(), t = x.type;
+      if (+x.updatedAt > SYNC.last && !c.doc.metadata.hasPendingWrites) SYNC.last = +x.updatedAt;
+      if (t === "del"){ if (x.ref && DB0[x.ref]){ delete DB0[x.ref]; ch = true; } if (x.ref) HC_drop(x.ref); return; }
+      if (t === "config" && id === TYPES.config + "_main" && (x.cacheEpoch || 0) > (SYNC.epoch || 0) && SYNC.full){ reset = true; }
+      if (!KEEP_T.has(t)){ if (x.devId) HC_drop(x.devId); return; }
+      DB0[id] = c.doc.metadata.hasPendingWrites && DB0[id] ? Object.assign({}, DB0[id], x) : x; ch = true;
+      if (x.devId) HC_drop(x.devId);
+    });
+    if (reset){ cacheClear(); stopLive(); startLive(); return; }   // admin vừa dọn dữ liệu: tải lại toàn bộ
+    if (ch){ rebuildSoon(); }
+    cacheSave();
+  }, onErr));
+}
+/* Xoá 1 bản ghi và để lại "bia mộ" cho các máy khác xoá khỏi bộ nhớ đệm */
+function delDoc(c, id){
+  const full = TYPES[c] + "_" + id;
+  delete DB0[full]; HC_drop(full); rebuildSoon();
+  return Promise.all([R(c, id).delete(), put("tomb", full, {ref: full})]);
+}
+/* Bộ nhớ tạm lịch sử từng máy (trang chi tiết máy), xoá khi có thay đổi của máy đó */
+const HC = {};
+function HC_drop(k){ Object.keys(HC).forEach(c => { if (k === c || String(k).indexOf(c) >= 0) delete HC[c]; }); }
+async function reloadAll(){ if (!confirm(T("Tải lại toàn bộ dữ liệu từ máy chủ? (chỉ cần khi dữ liệu hiển thị không đúng)"))) return;
+  cacheClear(); Object.keys(HC).forEach(k => delete HC[k]); F.repCache = {}; try { localStorage.removeItem(RKEY); } catch(e){} stopLive(); startLive(); toast(T("Đang tải lại dữ liệu…"), "ok"); }
 function startLive(){
+  stopLive();
+  const has = cacheLoad();
+  if (has && Date.now() - (SYNC.full || 0) < FULL_EVERY){ rebuild(); deltaListen(); return; }
+  fullLoad().then(deltaListen).catch(e => { onErr(e); setTimeout(() => { if (S.user && !UNSUB.length) startLive(); }, 30000); });
+}
+function startLiveOld(){
   stopLive();
   const sub = (q, fn) => UNSUB.push(q.onSnapshot(fn, onErr));
   sub(Q("devices"), sn => { S.dev = {}; docs("devices", sn).forEach(d => S.dev[d._id] = d); S.loaded.dev = 1; liveRender(); });
@@ -796,13 +876,15 @@ function tblLog(L, done){
       (done ? tAppr(l) : '<td class="tact">' + tSt(l, canApproveLog(l), "approveLog") + '</td>') + '</tr>').join("") + '</tbody></table></div>';
 }
 /* Ảnh nhỏ trong bảng: tải 1 lần rồi giữ trong bộ nhớ, bấm để phóng to */
-const PHC = {};
+const PHC = {}, PHP = {};
+/* Đọc 1 ảnh (mỗi ảnh chỉ đọc 1 lần trong phiên) */
+function phGet(id){ if (PHC[id]) return Promise.resolve(PHC[id]); if (PHP[id]) return PHP[id];
+  return PHP[id] = R("photos", id).get().then(sn => { delete PHP[id]; if (sn.exists){ PHC[id] = sn.data().data; return PHC[id]; } return null; }).catch(() => { delete PHP[id]; return null; }); }
 const phThumb = (id, cap) => '<img class="tth" data-ph="' + esc(id) + '" alt="' + esc(cap || "") + '" title="' + esc(cap || "") + '"' + (PHC[id] ? ' src="' + PHC[id] + '"' : "") + ' onclick="event.stopPropagation();if(this.src)zoom(this.src)">';
 function fillPh(){
   document.querySelectorAll("img.tth[data-ph]").forEach(im => {
     const id = im.dataset.ph; if (PHC[id]){ if (!im.getAttribute("src")) im.src = PHC[id]; return; }
-    if (PHC[id] === null) return; PHC[id] = null;
-    R("photos", id).get().then(sn => { if (sn.exists){ PHC[id] = sn.data().data; document.querySelectorAll('img.tth[data-ph="' + id + '"]').forEach(x => x.src = PHC[id]); } else delete PHC[id]; }).catch(() => { delete PHC[id]; });
+    phGet(id).then(src => { if (src) document.querySelectorAll('img.tth[data-ph="' + id + '"]').forEach(x => x.src = src); });
   });
 }
 function tblInc(L, done){
@@ -888,11 +970,13 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
   const c = V.p.code; if (!S.dev[c]) return;
   qrSvg(qrText(c)).then(s => { const e = $("#devqr"); if (e) e.innerHTML = s; }).catch(() => {});
   if (F.histFor === c && F.hist){ drawHist(); return; }
+  const hc = HC[c]; if (hc && Date.now() - hc.at < 600000){ F.histFor = c; F.hist = hc.hist; F.phist = hc.phist; F.chist = hc.chist; drawHist(); return; }
   Promise.all([Q("logs", "devId", c).get(), Q("incidents", "devId", c).get(), Q("parts", "devId", c).get(), isKnit(S.dev[c].group) ? Q("cnt", "devId", c).get() : null]).then(([a, b, p, cn]) => {
     F.chist = cn ? docs("cnt", cn).sort((x, y) => y.at - x.at) : [];
     F.histFor = c;
     F.hist = docs("logs", a).map(x => Object.assign(x, {_k: "log"})).concat(docs("incidents", b).map(x => Object.assign(x, {_k: "inc"}))).sort((x, y) => y.at - x.at).slice(0, 15);
     F.phist = docs("parts", p).sort((x, y) => y.at - x.at);
+    HC[c] = {at: Date.now(), hist: F.hist, phist: F.phist, chist: F.chist};
     drawHist();
   }).catch(e => { ["#hist", "#phist", "#chist"].forEach(id => { const el = $(id); if (el) el.innerHTML = empty("clock", T("Không tải được lịch sử")); }); });
 }};
@@ -946,13 +1030,14 @@ async function cntDelGo(id){
   let ok = false; try { ok = !!a && !!a.salt && !!a.hash && await sha256(a.salt + ":" + pw) === a.hash; } catch(e){}
   if (!ok){ if (++CNT_FAIL >= 5){ CNT_FAIL = 0; CNT_LOCK = Date.now() + 60000; } const i = $("#cdel_pw"); if (i){ i.value = ""; i.focus(); } return err(T("Sai mã PIN / mật khẩu.")); }
   CNT_FAIL = 0;
-  try { await withTimeout(R("cnt", id).delete(), 15000); }
+  try { await withTimeout(delDoc("cnt", id), 15000); }
   catch(e){ return err(T(e && e.code === "permission-denied" ? "Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules." : "Chưa xoá được. Kiểm tra mạng rồi thử lại.")); }
   F.chist = (F.chist || []).filter(y => y._id !== id);
   cntRecalc(x.devId); closePop(); toast(T("Đã xoá lần nhập sản lượng"), "ok"); drawHist(); if (V.view === "device") render(true);
 }
 /* Tính lại chuỗi sản lượng của 1 máy (từ cũ đến mới) và số mới nhất trên máy */
 function cntRecalc(c){
+  delete HC[c];
   const L = (F.chist || []).filter(x => x.devId === c).sort((a, b) => a.at - b.at);
   let prev = null;
   L.forEach(x => {
@@ -1073,7 +1158,7 @@ function recBox(){
 }
 function refreshRec(){
   const e = $("#recbox"); if (!e) return; e.outerHTML = recBox();
-  (F.parts || []).forEach((r, i) => { if (r.phId && !r.ph) R("photos", r.phId).get().then(s => { const b = document.getElementById("rph_" + i); if (b && s.exists){ const l = b.querySelector(".phload"); if (l) l.outerHTML = '<img src="' + s.data().data + '" onclick="zoom(this.src)">'; } }).catch(() => {}); });
+  (F.parts || []).forEach((r, i) => { if (r.phId && !r.ph) phGet(r.phId).then(src => { const b = document.getElementById("rph_" + i); if (b && src){ const l = b.querySelector(".phload"); if (l) l.outerHTML = '<img src="' + src + '" onclick="zoom(this.src)">'; } }); });
 }
 function setRec(i, v){ if (F.parts && F.parts[i]){ F.parts[i].rec = v; refreshRec(); } }
 async function addRecPh(inp, i){
@@ -1158,7 +1243,7 @@ function zoom(src){
 function loadPhotos(ids, el){
   if (!el || !ids || !ids.length) return;
   el.innerHTML = ids.map(id => '<div class="ph" id="p_' + id + '"><div class="phload">…</div></div>').join("");
-  ids.forEach(id => R("photos", id).get().then(s => { const b = document.getElementById("p_" + id); if (b && s.exists) b.innerHTML = '<img src="' + s.data().data + '" onclick="zoom(this.src)">'; }).catch(() => {}));
+  ids.forEach(id => phGet(id).then(src => { const b = document.getElementById("p_" + id); if (b && src) b.innerHTML = '<img src="' + src + '" onclick="zoom(this.src)">'; }));
 }
 
 /* ---- Báo sự cố ---- */
@@ -1196,7 +1281,7 @@ VIEWS.incnew = {title: () => V.p.edit ? T("Sửa báo cáo sự cố") : T("Báo
               : '<button class="btn r" onclick="saveInc()">' + ic("alert") + T("GỬI BÁO CÁO SỰ CỐ") + '</button>';
   return h;
 }, after(){
-  (F.oldPh || []).forEach(id => R("photos", id).get().then(s => { const b = document.getElementById("op_" + id); if (b && s.exists){ const l = b.querySelector(".phload"); if (l) l.outerHTML = '<img src="' + s.data().data + '" onclick="zoom(this.src)">'; } }).catch(() => {}));
+  (F.oldPh || []).forEach(id => phGet(id).then(src => { const b = document.getElementById("op_" + id); if (b && src){ const l = b.querySelector(".phload"); if (l) l.outerHTML = '<img src="' + src + '" onclick="zoom(this.src)">'; } }));
 }};
 const curInc0 = id => (F.incCache && F.incCache._id === id && Date.now() - (F.incCache._fresh || 0) < 5000 ? F.incCache : null) || S.incPend[id] || S.incOpen[id] || S.incMonth.find(x => x._id === id) || (F.incCache && F.incCache._id === id ? F.incCache : null);
 function devSelect(id, val, onch){
@@ -1686,7 +1771,7 @@ async function devDelGo(c){
   CNT_FAIL = 0; busy(true);
   try {
     const plans = Object.values(S.plans).filter(p => p.devId === c);
-    await withTimeout(Promise.all([R("devices", c).delete()].concat(plans.map(p => R("plans", p._id).delete()))), 15000);
+    await withTimeout(Promise.all([delDoc("devices", c)].concat(plans.map(p => delDoc("plans", p._id)))), 15000);
     delete S.dev[c]; plans.forEach(p => delete S.plans[p._id]);
     closePop(); toast(T("Đã xoá thiết bị {c}", {c}), "ok");
     if (V.view === "devices") render(true); else go("devices", {}, true);
@@ -1877,6 +1962,11 @@ function stopPlan(){ if (!confirm(T("Ngừng kế hoạch này? (lịch sử v�
 
 /* ---- Báo cáo (dashboard) – chỉ Admin / Quản đốc ---- */
 function monthsBack(m, n){ const out = []; let [y, mo] = m.split("-").map(Number); for (let k = 0; k < n; k++){ out.unshift(y + "-" + pad(mo)); if (--mo === 0){ mo = 12; y--; } } return out; }
+/* Số liệu các tháng cũ (trước tháng trước) ít thay đổi: lưu trên máy 7 ngày để không đọc lại mỗi lần mở Báo cáo */
+const RKEY = "kb_rep_v1_" + COLLECTION;
+function repLoad(){ if (F.repLoaded) return; F.repLoaded = 1; try { const o = JSON.parse(localStorage.getItem(RKEY) || "null"); if (o && Date.now() - o.at < 7 * 86400000) Object.keys(o.c).forEach(k => { if (!F.repCache[k]) F.repCache[k] = o.c[k]; }); } catch(e){} }
+function repSave(){ const cur = ym(), pm = prevYm(), c = {}; Object.keys(F.repCache || {}).forEach(k => { const mm = k.slice(1); if (mm < cur && /^[ilp]/.test(k)) c[k] = F.repCache[k]; });
+  try { const o = JSON.parse(localStorage.getItem(RKEY) || "null"); localStorage.setItem(RKEY, JSON.stringify({at: o && o.at && Date.now() - o.at < 7 * 86400000 ? o.at : Date.now(), c})); } catch(e){} }
 VIEWS.report = {wide: true, mgr: true, title: () => T("Báo cáo"), html(){
   F.repM = F.repM || ym();
   const live = Object.values(S.dev), act = live.filter(d => d.status !== "off");
@@ -1891,13 +1981,16 @@ VIEWS.report = {wide: true, mgr: true, title: () => T("Báo cáo"), html(){
   return h;
 }, async after(){
   const m = F.repM, ms = monthsBack(m, 6);
-  F.repCache = F.repCache || {};
+  F.repCache = F.repCache || {}; repLoad();
+  const cur = ym(), pm = prevYm(), fromDB = (t, f) => Object.keys(DB0).filter(k => DB0[k].type === t && f(DB0[k])).map(k => Object.assign({_id: k.slice(t.length + 1)}, DB0[k]));
+  [cur].forEach(x => { if (SYNC.full){ F.repCache["i" + x] = fromDB("inc", d => d.month === x); F.repCache["l" + x] = fromDB("log", d => d.month === x); F.repCache["p" + x] = fromDB("part", d => d.month === x); } });
   try {
-    const need = ms.filter(x => !F.repCache["i" + x] || x === ym());
-    const [lg, ...incs] = await Promise.all([(!F.repCache["l" + m] || m === ym()) ? Q("logs", "month", m).get() : null].concat(need.map(x => Q("incidents", "month", x).get())));
+    const need = ms.filter(x => !F.repCache["i" + x]);
+    const [lg, ...incs] = await Promise.all([!F.repCache["l" + m] ? Q("logs", "month", m).get() : null].concat(need.map(x => Q("incidents", "month", x).get())));
     if (lg) F.repCache["l" + m] = docs("logs", lg);
-    if (!F.repCache["p" + m] || m === ym()) F.repCache["p" + m] = docs("parts", await Q("parts", "month", m).get());
+    if (!F.repCache["p" + m]) F.repCache["p" + m] = docs("parts", await Q("parts", "month", m).get());
     need.forEach((x, k) => F.repCache["i" + x] = docs("incidents", incs[k]));
+    repSave();
   } catch(e){ onErr(e); const el = $("#rep"); if (el) el.innerHTML = empty("chart", T("Không tải được dữ liệu")); return; }
   if (F.repM !== m || V.view !== "report") return;
   drawReport(m, ms);
@@ -2060,6 +2153,7 @@ VIEWS.more = {mgr: true, title: () => T("Tài khoản & cài đặt"), html(){
 VIEWS.me = {title: () => T("Tôi"), html(){
   return '<div class="menu">' + userCard() +
     '<div class="it" onclick="setLang(LANG===\'vi\'?\'ja\':\'vi\')">' + ic("globe") + '<div class="f"><div class="t1">' + esc(T("Ngôn ngữ")) + '</div><div class="t2">' + (LANG === "vi" ? "Tiếng Việt → 日本語" : "日本語 → Tiếng Việt") + '</div></div></div>' +
+    '<div class="it" onclick="reloadAll()">' + ic("down") + '<div class="f"><div class="t1">' + esc(T("Tải lại toàn bộ dữ liệu")) + '</div><div class="t2">' + esc(T("Chỉ cần khi dữ liệu hiển thị không đúng")) + '</div></div></div>' +
     '<div class="it" onclick="logout()">' + ic("out") + '<div class="f"><div class="t1">' + esc(T("Đăng xuất")) + '</div></div></div></div>' + foot();
 }};
 const userCard = () => '<div class="card row"><div class="f"><div class="b" style="font-size:18px">' + esc(S.user.name) + '</div><div class="mu sm">' + esc(T("Mã NV")) + ': <span class="code">' + esc(S.user.id) + '</span></div></div>' + chip(ROLES[S.user.role], "g") + '</div>';
@@ -2103,7 +2197,7 @@ async function delAcc(aid){
   if (!isAdmin() || !a || id === S.user.id) return;
   if (!confirm(T("Xoá vĩnh viễn tài khoản {n} ({c})? Báo cáo cũ vẫn giữ tên người này.", {n: a.name, c: id}))) return;
   busy(true);
-  try { await withTimeout(R("accounts", id).delete(), 15000); delete S.acc[id]; toast(T("Đã xoá tài khoản"), "ok"); if (aid) render(true); else back(); }
+  try { await withTimeout(delDoc("accounts", id), 15000); delete S.acc[id]; toast(T("Đã xoá tài khoản"), "ok"); if (aid) render(true); else back(); }
   catch(e){ if (e && e.code === "permission-denied") toast(T("Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules."), "err"); else onErr(e); }
   finally { busy(false); }
 }
@@ -2163,7 +2257,8 @@ async function pgRun(){
   busy(true);
   try {
     for (let i = 0; i < refs.length; i += 400){ const b = FS.batch(); refs.slice(i, i + 400).forEach(r => b.delete(r)); await withTimeout(b.commit(), 60000); }
-    F.repCache = {}; F.plan = null; F.histFor = "";
+    F.repCache = {}; F.plan = null; F.histFor = ""; try { localStorage.removeItem(RKEY); } catch(e){}
+    put("config", "main", {cacheEpoch: Date.now()}, true);   // báo các máy khác tải lại toàn bộ
     toast(T("Đã xoá {n} bản ghi", {n: refs.length}), "ok"); pgShow();
   } catch(e){
     if (e && e.code === "permission-denied") toast(T("Security Rules đang chặn việc xoá. Cần cho phép xoá trong Firestore Rules."), "err"); else onErr(e);
@@ -2387,6 +2482,10 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Tải lại toàn bộ dữ liệu từ máy chủ? (chỉ cần khi dữ liệu hiển thị không đúng)": "サーバーから全データを再読み込みしますか？（表示がおかしい場合のみ）",
+"Đang tải lại dữ liệu…": "データを再読み込み中…",
+"Tải lại toàn bộ dữ liệu": "全データを再読み込み",
+"Chỉ cần khi dữ liệu hiển thị không đúng": "表示がおかしい場合のみ",
 "Chỉ Quản đốc hoặc Admin thêm, sửa thiết bị.": "設備の追加・編集は工場長またはAdminのみです。",
 "Xoá thiết bị": "設備を削除",
 "Máy sẽ bị xoá khỏi danh sách thiết bị cùng {n} kế hoạch bảo trì của máy.": "設備一覧から削除され、この設備の保全計画 {n} 件も削除されます。",
