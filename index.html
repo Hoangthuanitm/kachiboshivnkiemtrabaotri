@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Bảo trì KCB">
-<title>Bảo trì thiết bị · Kachiboshi</title>
+<title>Chuyền đan · Kachiboshi</title>
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <link rel="preload" as="script" href="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js">
@@ -58,7 +58,7 @@ h3{font-size:17px;margin:18px 0 8px;color:var(--g2)}
 /* KPI */
 .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
 .kpi{border-radius:16px;padding:14px 8px;text-align:center;border:0;cursor:pointer;color:#fff;min-height:104px;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.kpi b{font-size:38px;line-height:1}.kpi span{font-size:15px;font-weight:700;margin-top:6px}
+.kpi b{font-size:38px;line-height:1}.kpi b.sm{font-size:30px}.kpi b.xs{font-size:20px;line-height:1.15}.kpi b small{font-size:18px;opacity:.85}.kpi span{font-size:15px;font-weight:700;margin-top:6px}
 .kpi.r{background:var(--r)}.kpi.a{background:#E0A100;color:#2b2000}.kpi.g{background:var(--g)}
 .kpi.zero{opacity:.55}
 .brokebar{display:flex;align-items:center;gap:10px;width:100%;min-height:56px;border:0;border-radius:14px;background:var(--rl);color:var(--r);font-weight:800;font-size:17px;padding:10px 14px;margin-bottom:10px;cursor:pointer;text-align:left}
@@ -324,8 +324,8 @@ table.t th{font-size:13px;color:var(--mu);font-weight:600}
 <script>
 "use strict";
 /* ================== CẤU HÌNH ================== */
-const VERSION = "16/11/2026 08:40";
-const COLLECTION = "kachiboshibaotrithietbi";
+const VERSION = "19/11/2026 11:40";
+const COLLECTION = "kachiboshibaotrithietbi";   // giữ nguyên dữ liệu cũ của app Bảo trì (máy đan, sản lượng, sự cố…)
 const firebaseConfig = {
   apiKey: "AIzaSyC6WvHauG-yqzz6h8mDoDKF0Iw0NideXo4",
   authDomain: "history-testnghethu1-6.firebaseapp.com",
@@ -529,7 +529,7 @@ async function asActor(fn){ const a = await getActor(); if (!a) return; ACT = a;
    bằng 1 truy vấn duy nhất. Bản ghi bị xoá được báo qua "bia mộ" (type "del"). Tải lại toàn bộ khi: lần đầu, quá 7 ngày, admin dọn dữ liệu,
    hoặc người dùng bấm "Tải lại toàn bộ dữ liệu". */
 const CKEY = "kb_cache_v1_" + COLLECTION, SYNC_MARGIN = 2 * 3600000, FULL_EVERY = 7 * 86400000;
-const KEEP_T = new Set(["dev", "plan", "acc", "inc", "log", "config", "part"]);
+const KEEP_T = new Set(["dev", "acc", "inc", "config", "part"]);
 let DB0 = {}, SYNC = {last: 0, full: 0, epoch: 0}, svT;
 const prevYm = () => { const [y, m] = ym().split("-").map(Number); return m === 1 ? (y - 1) + "-12" : y + "-" + String(m - 1).padStart(2, "0"); };
 function cacheLoad(){ try { const o = JSON.parse(localStorage.getItem(CKEY) || "null"); if (o && o.db && o.sync){ DB0 = o.db; SYNC = o.sync; return true; } } catch(e){} DB0 = {}; SYNC = {last: 0, full: 0, epoch: 0}; return false; }
@@ -544,8 +544,9 @@ function cacheClear(){ DB0 = {}; SYNC = {last: 0, full: 0, epoch: 0}; try { loca
 function rebuild(){
   const L = {}; Object.keys(DB0).forEach(k => { const d = DB0[k], t = d.type, p = t + "_"; if (k.indexOf(p) !== 0) return; (L[t] = L[t] || []).push(Object.assign({_id: k.slice(p.length)}, d)); });
   const m = ym(), map = a => { const o = {}; a.forEach(x => o[x._id] = x); return o; };
-  const inc = L.inc || [], log = L.log || [];
-  S.dev = map(L.dev || []); S.plans = map((L.plan || []).filter(x => x.active === true)); S.acc = map(L.acc || []);
+  const knit = (L.dev || []).filter(x => isKnit(x.group)), kid = new Set(knit.map(x => x._id));   // app Chuyền đan: chỉ máy đan
+  const inc = (L.inc || []).filter(x => kid.has(x.devId)), log = [];
+  S.dev = map(knit); S.plans = {}; S.acc = map(L.acc || []);
   S.cfg = Object.assign({}, DEF_CFG, (L.config || []).find(x => x._id === "main") || {});
   S.incOpen = map(inc.filter(x => x.open === true)); S.incMonth = inc.filter(x => x.month === m); S.incPend = map(inc.filter(x => x.appr === false));
   S.incAppr = inc.filter(x => x.apprMonth === m); S.logsMonth = log.filter(x => x.month === m); S.logAppr = log.filter(x => x.apprMonth === m);
@@ -556,9 +557,8 @@ function rebuild(){
 let rbT; const rebuildSoon = () => { clearTimeout(rbT); rbT = setTimeout(rebuild, 40); };
 /* Tải toàn bộ (lần đầu / định kỳ): chỉ các truy vấn app thực sự cần */
 async function fullLoad(){
-  const m = ym(), qs = [Q("devices"), Q("plans", "active", true), Q("accounts"), Q("incidents", "open", true), Q("incidents", "appr", false),
-    Q("incidents", "month", m), Q("incidents", "apprMonth", m), Q("logs", "appr", false), Q("logs", "rej", true),
-    Q("logs", "month", m), Q("logs", "apprMonth", m), Q("parts", "month", m)];
+  const m = ym(), qs = [Q("devices"), Q("accounts"), Q("incidents", "open", true), Q("incidents", "appr", false),
+    Q("incidents", "month", m), Q("incidents", "apprMonth", m), Q("parts", "month", m)];
   const res = await Promise.all(qs.map(q => q.get()).concat([R("config", "main").get()]));
   const db = {}; let mx = 0;
   res.slice(0, -1).forEach(sn => sn.docs.forEach(d => { const x = d.data(); db[d.id] = x; if (+x.updatedAt > mx) mx = +x.updatedAt; }));
@@ -661,8 +661,8 @@ function go(view, p, replace){
   render();
 }
 function back(){ ((history.state && history.state.d) || 0) > 0 ? history.back() : go("home", {}, true); }
-const NAV_W = [["home","home","Trang chủ"],["knit","knit","Máy đan"],["tasks","list","Việc"],["incidents","alert","Sự cố"],["me","user","Tôi"]];
-const NAV_M = [["home","home","Trang chủ"],["knit","knit","Máy đan"],["devices","box","Thiết bị"],["plans","cal","Kế hoạch"],["incidents","alert","Sự cố"],["report","chart","Báo cáo"]];
+const NAV_W = [["home","home","Trang chủ"],["knit","knit","Máy đan"],["incidents","alert","Sự cố"],["me","user","Tôi"]];
+const NAV_M = [["home","home","Trang chủ"],["knit","knit","Máy đan"],["devices","box","Thiết bị"],["incidents","alert","Sự cố"],["report","chart","Báo cáo"]];
 window.addEventListener("popstate", e => {
   if (SCAN.on){ closeScan(true); return; }
   if ($(".lb")){ $(".lb").remove(); return; }
@@ -684,7 +684,7 @@ function render(keepScroll){
   $("#app").innerHTML =
     '<header class="top">' +
       (isRoot ? '<img class="lg" src="' + LOGO + '" alt="">' : '<button class="hb" onclick="back()" aria-label="back">' + ic("back") + '</button>') +
-      '<div class="ttl"><b>' + esc(v.title ? v.title() : T("Bảo trì thiết bị")) + '</b><small>KACHIBOSHI VIỆT NAM</small></div>' +
+      '<div class="ttl"><b>' + esc(v.title ? v.title() : T("Chuyền đan")) + '</b><small>KACHIBOSHI VIỆT NAM</small></div>' +
       '<span class="dot ' + (navigator.onLine ? "" : "off") + '" id="netdot" title="online"></span>' +
       '<button class="hb" onclick="setLang(LANG===\'vi\'?\'ja\':\'vi\')">' + (LANG === "vi" ? "日本語" : "Tiếng Việt") + '</button>' +
       (isViewer() ? '<button class="hb" onclick="go(\'more\')" aria-label="menu">' + ic("user") + '</button>' : "") +
@@ -699,8 +699,8 @@ function renderChrome(){
   const n = $("#nav"); if (!n) return;
   const nav = isViewer() ? NAV_M : NAV_W;
   const b = buckets();
-  const badge = {tasks: b.over.length, incidents: Object.keys(S.incOpen).length};
-  if (isViewer()) badge.home = b.over.length;
+  const badge = {incidents: Object.keys(S.incOpen).length};
+  if (canFinal()) badge.home = Object.values(S.incPend).filter(isPend).length;
   n.innerHTML = nav.map(x => '<button class="' + (V.view === x[0] ? "on" : "") + '" onclick="go(\'' + x[0] + '\')">' + ic(x[1]) + esc(T(x[2])) +
     (badge[x[0]] ? '<span class="bd">' + badge[x[0]] + '</span>' : "") + '</button>').join("");
   const d = $("#netdot"); if (d) d.className = "dot " + (navigator.onLine ? "" : "off");
@@ -803,10 +803,15 @@ VIEWS.home = {wide: true, live: true, html(){
   const b = buckets(), u = S.user;
   let h = '<div class="hgrid"><div>' + '<div class="row" style="margin-bottom:12px"><div class="f"><div class="mu sm">' + esc(T("Xin chào")) + '</div><div class="b" style="font-size:19px">' + esc(u.name) + '</div></div>' + chip(ROLES[u.role], "g") + '</div>';
   h += '<button class="btn bigscan" onclick="openScan()">' + ic("qr") + T("QUÉT MÃ QR MÁY") + '</button>';
-  h += '<div class="kpis">' +
-    '<button class="kpi r ' + (b.over.length ? "" : "zero") + '" onclick="go(\'tasks\',{tab:\'over\'})"><b>' + b.over.length + '</b><span>' + esc(T("Trễ hạn")) + '</span></button>' +
-    '<button class="kpi a ' + (b.today.length ? "" : "zero") + '" onclick="go(\'tasks\',{tab:\'today\'})"><b>' + b.today.length + '</b><span>' + esc(T("Hôm nay")) + '</span></button>' +
-    '<button class="kpi g ' + (b.week.length ? "" : "zero") + '" onclick="go(\'tasks\',{tab:\'week\'})"><b>' + b.week.length + '</b><span>' + esc(T("Tuần này")) + '</span></button></div>';
+  // hôm nay: máy đang hỏng, số máy đã cập nhật sản lượng, tổng sản lượng
+  { const act = knitDevs(), td = today(), up = act.filter(d => d.cntAt && ymd(new Date(d.cntAt)) === td), sum = up.reduce((a, d) => a + (+d.cntDiff || 0), 0);
+    const nBrk = new Set(Object.values(S.incOpen).map(i => i.devId)).size;
+    h += '<div class="kpis">' +
+      '<button class="kpi r ' + (nBrk ? "" : "zero") + '" onclick="go(\'incidents\')"><b>' + nBrk + '</b><span>' + esc(T("Máy đang hỏng")) + '</span></button>' +
+      '<button class="kpi a ' + (up.length ? "" : "zero") + '" onclick="go(\'knit\')"><b class="sm">' + up.length + '<small>/' + act.length + '</small></b><span>' + esc(T("Đã cập nhật sản lượng hôm nay")) + '</span></button>' +
+      '<button class="kpi g ' + (sum ? "" : "zero") + '" onclick="go(\'knit\')"><b class="xs">' + esc(sum ? pcsText(sum) : "0") + '</b><span>' + esc(T("Sản lượng hôm nay")) + '</span></button></div>';
+    if (canCnt() && !isMgr()) h += '<button class="btn w" style="margin-bottom:10px" onclick="openScan(\'cnt\')">' + ic("qr") + T("Quét QR cập nhật sản lượng") + '</button>';
+  }
   // dải đỏ: máy đang hỏng (chỉ hiện khi có)
   const open = Object.values(S.incOpen);
   if (open.length){
@@ -824,16 +829,16 @@ VIEWS.home = {wide: true, live: true, html(){
   if (isDevice()){ const nr = rejList().length; if (nr) h += '<button class="brokebar" onclick="go(\'returned\')">' + ic("alert") + '<span class="f">' + esc(T("{n} báo cáo bị quản đốc trả lại, cần sửa và gửi lại", {n: nr})) + '</span>' + ic("chev") + '</button>'; }
   if (isDevice()) h += '<div class="mu sm" style="margin:0 2px 10px">' + esc(T("Máy tablet dùng chung: khi lưu, chọn tên của bạn và nhập mã PIN.")) + '</div>';
   if (!isWatcher()) h += '<button class="btn w" onclick="go(\'incnew\')">' + ic("alert") + T("Báo sự cố") + '</button>';
-  const L = b.over.concat(b.today);
-  h += '</div><div><h3 class="h3top">' + esc(T("Việc cần làm")) + '</h3>' + (L.length ? L.slice(0, 8).map(planItem).join("") : empty("ok", T("Hôm nay không có việc cần làm.")));
+  h += '</div><div>';
+  if (!isViewer()) h += '<h3 class="h3top">' + esc(T("Máy đang hỏng")) + '</h3>' + (open.length ? open.sort((a, b) => a.at - b.at).slice(0, 8).map(incItem).join("") : empty("ok", T("Không có máy nào đang hỏng.")));
   // Quản đốc: duyệt ngay dưới Việc cần làm (Giám đốc chỉ xem, không có nút duyệt)
   if (isViewer()){
     const PL = Object.values(S.logPend).filter(l => l.appr === false && !l.rej).sort((a, b) => a.at - b.at);
     const PI = Object.values(S.incPend).filter(isPend).sort((a, b) => a.fixAt - b.fixAt);
-    const tab = F.apTab || (PL.length || !PI.length ? "log" : "inc");
+    const tab = "inc";
     const tb = (k, t, n) => '<button class="' + (tab === k ? "on" : "") + '" onclick="F.apTab=\'' + k + '\';render(true)">' + esc(T(t)) + (n ? '<span class="n">' + n + '</span>' : "") + '</button>';
-    h += '<h3>' + esc(T("Chờ duyệt")) + '</h3>' + (isAdmin() ? '<div class="mu sm" style="margin:-4px 2px 8px">' + esc(T("Quản trị có thể duyệt thay quản đốc. Người duyệt được ghi là Admin.")) + '</div>' : "") +
-      '<div class="tabs">' + tb("log", "Bảo trì", PL.length) + tb("inc", "Báo cáo sự cố", PI.length) + '</div>';
+    h += '<h3 class="h3top">' + esc(T("Báo cáo sự cố chờ duyệt")) + (PI.length ? ' <span class="chip a">' + PI.length + '</span>' : "") + '</h3>' + (isAdmin() ? '<div class="mu sm" style="margin:-4px 2px 8px">' + esc(T("Quản trị có thể duyệt thay quản đốc. Người duyệt được ghi là Admin.")) + '</div>' : "") +
+      "";
     const tblF = tab === "log" ? tblLog : tblInc;
     if (tab === "log") h += PL.length ? tblF(PL, false) : '<div class="cnone">' + esc(T("Không có bảo trì nào chờ duyệt.")) + '</div>';
     else h += PI.length ? tblF(PI, false) : '<div class="cnone">' + esc(T("Không có báo cáo nào chờ duyệt.")) + '</div>';
@@ -960,8 +965,6 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
     (canManageDev() ? '<button class="btn w" onclick="go(\'devform\',{code:\'' + c + '\'})">' + ic("edit") + T("Sửa") + '</button><button class="btn w" style="color:var(--r)" onclick="devDelPop(\'' + c + '\')">' + ic("trash") + T("Xoá") + '</button>' : "") + '</div>';
   if (isKnit(d.group) && canCnt()) h += '<button class="btn gh" style="margin-bottom:6px" onclick="go(\'cntone\',{code:\'' + c + '\'})">' + ic("chart") + T("Cập nhật sản lượng máy này") + '</button>';
   if (incs.length) h += '<h3>' + esc(T("Sự cố chưa xong")) + '</h3>' + incs.map(incItem).join("");
-  h += '<h3>' + esc(T("Kế hoạch bảo trì")) + '</h3>' + (plans.length ? plans.map(p => planItem(p)).join("") : empty("cal", T("Chưa có kế hoạch")));
-  if (isMgr()) h += '<button class="btn gh" onclick="go(\'planform\',{dev:\'' + c + '\'})">' + ic("plus") + T("Thêm kế hoạch cho máy này") + '</button>';
   if (isKnit(d.group)) h += '<h3>' + esc(T("Sản lượng máy đan")) + '</h3>' + (d.cntAt ? '<div class="card" style="padding:0;overflow:hidden;margin-bottom:8px">' + cntBand(d) + '</div>' : "") + '<div id="chist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
   h += '<h3>' + esc(T("Linh kiện đã thay")) + '</h3><div id="phist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
   h += '<h3>' + esc(T("Lịch sử gần đây")) + '</h3><div id="hist"><div class="empty"><div class="spin" style="margin:auto"></div></div></div>';
@@ -971,7 +974,7 @@ VIEWS.device = {live: true, title: () => T("Thiết bị"), html(){
   qrSvg(qrText(c)).then(s => { const e = $("#devqr"); if (e) e.innerHTML = s; }).catch(() => {});
   if (F.histFor === c && F.hist){ drawHist(); return; }
   const hc = HC[c]; if (hc && Date.now() - hc.at < 600000){ F.histFor = c; F.hist = hc.hist; F.phist = hc.phist; F.chist = hc.chist; drawHist(); return; }
-  Promise.all([Q("logs", "devId", c).get(), Q("incidents", "devId", c).get(), Q("parts", "devId", c).get(), isKnit(S.dev[c].group) ? Q("cnt", "devId", c).get() : null]).then(([a, b, p, cn]) => {
+  Promise.all([{docs: []}, Q("incidents", "devId", c).get(), Q("parts", "devId", c).get(), isKnit(S.dev[c].group) ? Q("cnt", "devId", c).get() : null]).then(([a, b, p, cn]) => {
     F.chist = cn ? docs("cnt", cn).sort((x, y) => y.at - x.at) : [];
     F.histFor = c;
     F.hist = docs("logs", a).map(x => Object.assign(x, {_k: "log"})).concat(docs("incidents", b).map(x => Object.assign(x, {_k: "inc"}))).sort((x, y) => y.at - x.at).slice(0, 15);
@@ -1786,7 +1789,7 @@ VIEWS.devform = {mgr: true, noDir: true, title: () => V.p.code ? T("Sửa thiế
   if (!canManageDev()) return empty("box", T("Chỉ Quản đốc hoặc Admin thêm, sửa thiết bị."));
   const e = V.p.code ? S.dev[V.p.code] : null;
   if (V.p.code && !e) return empty("box", "…");
-  const d = e || {status: "ok"};
+  const d = e || {status: "ok", group: "Máy đan"};
   F = {form: "dev", status: d.status || "ok"};
   const fld = (id, lab, val, opt) => '<div class="lc"><label class="' + (opt && opt.req ? "req" : "") + '">' + esc(T(lab)) + '</label><input id="' + id + '" value="' + esc(val || "") + '"' + (opt && opt.attr || "") + '></div>';
   let h = "";
@@ -1794,7 +1797,7 @@ VIEWS.devform = {mgr: true, noDir: true, title: () => V.p.code ? T("Sửa thiế
     h += '<div class="lc"><label class="req">' + esc(T("Mã thiết bị")) + '</label><input class="code" id="fcode" value="' + F.auto + '" style="text-transform:uppercase;font-size:20px" autocapitalize="characters">' +
     '<div class="mu sm" style="margin-top:4px">' + esc(T("Mã tự đặt theo số thứ tự, không trùng. Có thể sửa nếu cần.")) + '</div></div>'; }
   else h += '<div class="hl">' + esc(T("Mã thiết bị")) + ': <b class="code">' + esc(V.p.code) + '</b> <span class="mu sm">(' + esc(T("không đổi được")) + ')</span></div>';
-  const groups = (S.cfg.groups || []).slice(); if (d.group && groups.indexOf(d.group) < 0) groups.push(d.group);
+  const groups = ["Máy đan"]; if (d.group && groups.indexOf(d.group) < 0) groups.push(d.group);
   h += '<div class="lc"><label class="req">' + esc(T("Nhóm máy")) + '</label><select id="fgroup" onchange="document.getElementById(\'gaugeBox\').style.display=isKnit(this.value)?\'\':\'none\'"><option value="">' + esc(T("— Chọn nhóm máy —")) + '</option>' +
     groups.map(g => '<option' + (g === d.group ? " selected" : "") + '>' + esc(g) + '</option>').join("") + '</select></div>';
   h += '<div class="lc" id="gaugeBox"' + (isKnit(d.group) ? "" : ' style="display:none"') + '><label class="req">' + esc(T("Loại máy")) + '</label><select id="fgauge"><option value="">' + esc(T("— Chọn loại máy —")) + '</option>' +
@@ -1804,7 +1807,7 @@ VIEWS.devform = {mgr: true, noDir: true, title: () => V.p.code ? T("Sửa thiế
   h += '<datalist id="dl_area">' + areasAll().map(a => '<option value="' + esc(a) + '">').join("") + '</datalist>';
   h += '<div class="grid2">' + fld("fmaker", "Hãng", d.maker) + fld("fmodel", "Model", d.model) + '</div>';
   h += fld("fsince", "Ngày đưa vào sử dụng", d.since, {attr: ' type="date"'});
-  if (e) h += '<div class="ck ' + (F.status === "off" ? "on" : "") + '" onclick="F.status=F.status===\'off\'?\'ok\':\'off\';this.classList.toggle(\'on\',F.status===\'off\')"><span class="bx">' + ic("ok") + '</span><span>' + esc(T("Ngừng sử dụng máy này (ẩn khỏi kế hoạch)")) + '</span></div>';
+  if (e) h += '<div class="ck ' + (F.status === "off" ? "on" : "") + '" onclick="F.status=F.status===\'off\'?\'ok\':\'off\';this.classList.toggle(\'on\',F.status===\'off\')"><span class="bx">' + ic("ok") + '</span><span>' + esc(T("Ngừng sử dụng máy này")) + '</span></div>';
   h += '<div class="lc"><label>' + esc(T("Ghi chú")) + '</label><textarea id="fnote">' + esc(d.note || "") + '</textarea></div>';
   h += '<button class="btn" onclick="saveDev()">' + ic("ok") + T("LƯU THIẾT BỊ") + '</button>';
   return h;
@@ -1986,13 +1989,13 @@ VIEWS.report = {wide: true, mgr: true, title: () => T("Báo cáo"), html(){
   [cur].forEach(x => { if (SYNC.full){ F.repCache["i" + x] = fromDB("inc", d => d.month === x); F.repCache["l" + x] = fromDB("log", d => d.month === x); F.repCache["p" + x] = fromDB("part", d => d.month === x); } });
   try {
     const need = ms.filter(x => !F.repCache["i" + x]);
-    const [lg, ...incs] = await Promise.all([!F.repCache["l" + m] ? Q("logs", "month", m).get() : null].concat(need.map(x => Q("incidents", "month", x).get())));
-    if (lg) F.repCache["l" + m] = docs("logs", lg);
+    const incs = await Promise.all(need.map(x => Q("incidents", "month", x).get()));
     if (!F.repCache["p" + m]) F.repCache["p" + m] = docs("parts", await Q("parts", "month", m).get());
     need.forEach((x, k) => F.repCache["i" + x] = docs("incidents", incs[k]));
     repSave();
   } catch(e){ onErr(e); const el = $("#rep"); if (el) el.innerHTML = empty("chart", T("Không tải được dữ liệu")); return; }
   if (F.repM !== m || V.view !== "report") return;
+  Object.keys(F.repCache).forEach(k => { if (/^[ip]/.test(k)) F.repCache[k] = F.repCache[k].filter(x => !!S.dev[x.devId] || (k[0] === "p" && isKnit(x.group))); });   // chỉ máy đan
   drawReport(m, ms);
 }};
 /* Quản lý kim: kim đã thay trong tháng (từ báo cáo sự cố) và kim cũ thu hồi.
@@ -2046,11 +2049,6 @@ function drawReport(m, ms){
     stat(fixed.length, T("Đã sửa xong"), "var(--g)") +
     stat(avgFix == null ? "–" : fmtDur(avgFix), T("Thời gian sửa trung bình")) +
     stat(inc.length ? fmtDur(down) : "–", T("Tổng thời gian máy hỏng")) + '</div>';
-  h += '<h3>' + esc(T("Bảo trì trong tháng")) + '</h3><div class="stats">' +
-    stat(logs.length, T("Số lần đã làm")) +
-    stat(logs.length ? Math.round(ontime * 100 / logs.length) + "%" : "–", T("Làm đúng hạn"), logs.length && ontime < logs.length ? "var(--a)" : "var(--g)") +
-    stat(overNow, T("Việc đang trễ (hiện tại)"), overNow ? "var(--r)" : "", "go('tasks',{tab:'over'})") +
-    stat(ng, T("Kết quả Không đạt"), ng ? "var(--r)" : "") + '</div>';
   // Biểu đồ cột: số lần hỏng 6 tháng
   const counts = ms.map(x => (F.repCache["i" + x] || []).length), mx = Math.max(1, ...counts);
   h += '<div class="rgrid"><div class="card"><div class="b">' + esc(T("Số lần hỏng 6 tháng gần nhất")) + '</div><div class="vbars">' +
@@ -2068,8 +2066,8 @@ function drawReport(m, ms){
   const areaOf = id => (S.dev[id] && S.dev[id].area) || T("(Chưa ghi)");
   inc.forEach(i => { const k = areaOf(i.devId); (ar[k] = ar[k] || {dev: 0, inc: 0, lg: 0, ok: 0}).inc++; });
   logs.forEach(l => { const k = areaOf(l.devId); const o = ar[k] = ar[k] || {dev: 0, inc: 0, lg: 0, ok: 0}; o.lg++; if (!l.late) o.ok++; });
-  h += '<div class="card"><div class="b" style="margin-bottom:6px">' + esc(T("Theo khu vực")) + '</div><div class="scroll"><table class="t"><thead><tr><th>' + esc(T("Khu vực")) + '</th><th class="n">' + esc(T("Số máy")) + '</th><th class="n">' + esc(T("Lần hỏng")) + '</th><th class="n">' + esc(T("Đúng hạn")) + '</th></tr></thead><tbody>' +
-    Object.entries(ar).sort((a, b) => b[1].inc - a[1].inc || b[1].dev - a[1].dev).map(([k, o]) => '<tr><td>' + esc(k) + '</td><td class="n">' + o.dev + '</td><td class="n"' + (o.inc ? ' style="color:var(--r);font-weight:700"' : "") + '>' + o.inc + '</td><td class="n">' + (o.lg ? Math.round(o.ok * 100 / o.lg) + "%" : "–") + '</td></tr>').join("") + '</tbody></table></div></div>';
+  h += '<div class="card"><div class="b" style="margin-bottom:6px">' + esc(T("Theo khu vực")) + '</div><div class="scroll"><table class="t"><thead><tr><th>' + esc(T("Khu vực")) + '</th><th class="n">' + esc(T("Số máy")) + '</th><th class="n">' + esc(T("Lần hỏng")) + '</th></tr></thead><tbody>' +
+    Object.entries(ar).sort((a, b) => b[1].inc - a[1].inc || b[1].dev - a[1].dev).map(([k, o]) => '<tr><td>' + esc(k) + '</td><td class="n">' + o.dev + '</td><td class="n"' + (o.inc ? ' style="color:var(--r);font-weight:700"' : "") + '>' + o.inc + '</td></tr>').join("") + '</tbody></table></div></div>';
   // Linh kiện đã thay trong tháng: theo loại linh kiện, chia theo nhóm máy / loại máy
   const parts = F.repCache["p" + m] || [], pt = {};
   parts.forEach(x => { const o = pt[x.name] = pt[x.name] || {q: 0, n: 0, dev: new Set(), by: {}}; const g = groupLabel(x) || T("(Chưa phân nhóm)");
@@ -2081,7 +2079,7 @@ function drawReport(m, ms){
       (F.repPN = Object.entries(pt).sort((a, b) => b[1].q - a[1].q)).map(([n, o], k) => '<tr><td><b>' + esc(n) + '</b></td><td class="sm">' + Object.entries(o.by).sort((a, b) => b[1] - a[1]).map(([g, q]) => esc(g) + ': <b>' + q + '</b>').join(" · ") + '</td><td class="n">' + o.dev.size + '</td><td class="n"><b>' + o.q + '</b></td><td class="pdbtn"><button class="btn sm w" onclick="partPop(' + k + ')">' + esc(T("Chi tiết")) + '</button></td></tr>').join("") + '</tbody></table></div>'
       : '<div class="mu sm">' + esc(T("Tháng này chưa ghi linh kiện nào.")) + '</div>') + '</div>';
   h += kimCard(inc);
-  h += '<div class="btns"><button class="btn w" onclick="exp(\'log\')">' + ic("down") + T("Xuất nhật ký bảo trì") + '</button><button class="btn w" onclick="exp(\'inc\')">' + ic("down") + T("Xuất sự cố") + '</button><button class="btn w" onclick="exp(\'part\')">' + ic("down") + T("Xuất linh kiện") + '</button></div>';
+  h += '<div class="btns"><button class="btn w" onclick="exp(\'inc\')">' + ic("down") + T("Xuất sự cố") + '</button><button class="btn w" onclick="exp(\'part\')">' + ic("down") + T("Xuất linh kiện") + '</button></div>';
   h += '<div class="mu sm" style="margin-top:10px">' + esc(T("Thời gian hỏng tính từ lúc báo sự cố đến lúc bấm \"Đã sửa xong\"; sự cố chưa xong tính đến hiện tại. Số liệu tháng tính theo sự cố được báo trong tháng.")) + '</div>';
   el.innerHTML = h;
 }
@@ -2221,7 +2219,7 @@ async function saveAcc(){
 
 /* ---- Xoá toàn bộ dữ liệu, trừ tài khoản (chỉ Quản trị, mật khẩu 112) ---- */
 const PURGE_PW = "112";
-const PURGE_KINDS = [["devices", "Thiết bị"], ["plans", "Kế hoạch bảo trì"], ["logs", "Nhật ký bảo trì"], ["incidents", "Sự cố"], ["photos", "Ảnh"], ["parts", "Linh kiện đã thay"], ["prodlog", "Lịch sử mã hàng"], ["config", "Danh mục cài đặt (trở về mặc định)"]];
+const PURGE_KINDS = [["devices", "Thiết bị"], ["incidents", "Sự cố"], ["photos", "Ảnh"], ["parts", "Linh kiện đã thay"], ["prodlog", "Lịch sử mã hàng"], ["config", "Danh mục cài đặt (trở về mặc định)"]];
 VIEWS.purge = {mgr: true, noDir: true, title: () => T("Xoá toàn bộ dữ liệu"), html(){
   if (!isAdmin()) return empty("trash", T("Không có quyền"));
   if (!F.pg) F = {pg: 1, plan: null};
@@ -2273,21 +2271,18 @@ VIEWS.settings = {mgr: true, noDir: true, title: () => T("Cài đặt danh mục
     '<div class="lc"><label>' + esc(T("Mã hàng máy đan (mỗi dòng 1 mục)")) + '</label><textarea id="sprods" rows="6">' + esc((S.cfg.products || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Danh mục linh kiện (mỗi dòng 1 mục)")) + '</label><textarea id="sparts" rows="6">' + esc((S.cfg.parts || []).join("\n")) + '</textarea></div>' +
     '<div class="lc"><label>' + esc(T("Khu vực / xưởng (mỗi dòng 1 mục)")) + '</label><textarea id="sareas" rows="6">' + esc((S.cfg.areas || []).join("\n")) + '</textarea></div>' +
-    '<div class="lc"><label>' + esc(T("Hạng mục bảo trì thường dùng (mỗi dòng 1 mục)")) + '</label><textarea id="skinds" rows="6">' + esc((S.cfg.kinds || []).join("\n")) + '</textarea></div>' +
     '<button class="btn" onclick="saveCfg()">' + ic("ok") + T("LƯU") + '</button>' + foot();
 }};
 function saveCfg(){
   const sp = id => $(id).value.split("\n").map(s => s.trim()).filter(Boolean);
-  put("config", "main", {products: sp("#sprods"), depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas"), kinds: sp("#skinds")}, true); savedMsg(); back();
+  put("config", "main", {products: sp("#sprods"), depts: sp("#sdepts"), groups: sp("#sgroups"), parts: sp("#sparts"), areas: sp("#sareas")}, true); savedMsg(); back();
 }
 /* ---- Xuất CSV ---- */
 VIEWS.export = {mgr: true, title: () => T("Xuất dữ liệu"), html(){
   return '<div class="lc"><label>' + esc(T("Tháng")) + '</label><input id="xm" type="month" value="' + ym() + '"></div><div class="btns" style="flex-direction:column">' +
     '<button class="btn" onclick="exp(\'dev\')">' + ic("down") + T("Danh sách thiết bị") + '</button>' +
-    '<button class="btn" onclick="exp(\'log\')">' + ic("down") + T("Nhật ký bảo trì của tháng") + '</button>' +
     '<button class="btn" onclick="exp(\'inc\')">' + ic("down") + T("Sự cố của tháng") + '</button>' +
-    '<button class="btn" onclick="exp(\'part\')">' + ic("down") + T("Linh kiện đã thay của tháng") + '</button>' +
-    '<button class="btn w" onclick="exp(\'plan\')">' + ic("down") + T("Kế hoạch đang chạy") + '</button></div>' +
+    '<button class="btn" onclick="exp(\'part\')">' + ic("down") + T("Linh kiện đã thay của tháng") + '</button></div>' +
     '<div class="mu sm" style="margin-top:10px">' + esc(T("File CSV mở được bằng Excel (giữ đúng tiếng Việt / tiếng Nhật).")) + '</div>';
 }};
 function csvDown(name, rows){
@@ -2307,11 +2302,11 @@ async function exp(k){
       csvDown("bao-tri-" + m + ".csv", [[T("Ngày giờ"), T("Mã máy"), T("Tên máy"), T("Hạng mục"), T("Kết quả"), T("Hạn"), T("Trễ"), T("Người làm"), T("Ghi chú"), T("Bước chưa đạt")]]
         .concat(L.map(l => [fmtDT(l.at), l.devId, l.devName, l.task, l.result === "ng" ? T("Không đạt") : T("Đạt"), l.due, l.late ? "x" : "", l.byName, l.note, (l.steps || []).filter(s => !s.ok).map(s => s.t).join(" | ")])));
     } else if (k === "part"){
-      const L = docs("parts", await Q("parts", "month", m).get()).sort((a, b) => a.at - b.at);
+      const L = docs("parts", await Q("parts", "month", m).get()).filter(x => !!S.dev[x.devId] || isKnit(x.group)).sort((a, b) => a.at - b.at);
       csvDown("linh-kien-" + m + ".csv", [[T("Ngày giờ"), T("Mã máy"), T("Tên máy"), T("Nhóm máy"), T("Loại máy"), T("Khu vực"), T("Linh kiện"), T("Số lượng"), T("Nguồn"), T("Người ghi")]]
         .concat(L.map(x => [fmtDT(x.at), x.devId, x.devName, x.group, x.gauge, x.area, x.name, x.qty, x.src === "inc" ? T("Sửa máy hỏng") : T("Bảo trì định kỳ"), x.byName])));
     } else {
-      const L = docs("incidents", await Q("incidents", "month", m).get()).sort((a, b) => a.at - b.at);
+      const L = docs("incidents", await Q("incidents", "month", m).get()).filter(x => !!S.dev[x.devId]).sort((a, b) => a.at - b.at);
       csvDown("su-co-" + m + ".csv", [[T("Ngày giờ báo"), T("Mã máy"), T("Tên máy"), T("Mô tả"), T("Người báo"), T("Tình trạng"), T("Hướng xử lý"), T("Khắc phục"), T("Người sửa xong"), T("Xong lúc"), T("Thời gian sửa (phút)"), T("Linh kiện đã thay")]]
         .concat(L.map(i => [fmtDT(i.at), i.devId, i.devName, i.desc, i.byName, T(ISTATUS[iSt(i)][0]), i.next, i.fix, i.fixBy || "", fmtDT(i.fixAt), i.fixAt ? Math.round((i.fixAt - i.at) / 60000) : "", (i.parts || []).map(r => r.n + " × " + r.q).join("; ")])));
     }
@@ -2397,7 +2392,7 @@ function loginScreen(first, err){
   stopLive();
   const last = lsGet("kb_last") || "";
   $("#app").innerHTML = '<div class="login"><img class="logo" src="' + LOGO + '" alt="Kachiboshi">' +
-    '<h1>' + esc(T("Bảo trì thiết bị")) + '</h1><div class="sub">' + esc(first ? T("Lần đầu sử dụng: tạo tài khoản Quản trị") : T("Đăng nhập bằng mã nhân viên và mã PIN")) + '</div>' + (err ? '<div id="connerr">' + connErr(err) + '</div>' : '<div id="connerr"></div>') +
+    '<h1>' + esc(T("Chuyền đan")) + '</h1><div class="sub">' + esc(first ? T("Lần đầu sử dụng: tạo tài khoản Quản trị") : T("Đăng nhập bằng mã nhân viên và mã PIN")) + '</div>' + (err ? '<div id="connerr">' + connErr(err) + '</div>' : '<div id="connerr"></div>') +
     '<div class="lc"><label>' + esc(T("Mã nhân viên")) + '</label><input id="lid" autocapitalize="characters" style="text-transform:uppercase" value="' + esc(first ? "ADMIN" : last) + '"></div>' +
     (first ? '<div class="lc"><label>' + esc(T("Họ tên")) + '</label><input id="lname"></div>' : "") +
     '<div class="lc"><label>' + esc(T("Mã PIN")) + '</label><input id="lpin" class="pin" type="password" inputmode="numeric" maxlength="8" autocomplete="current-password" onkeydown="if(event.key===\'Enter\')doLogin(' + (first ? 1 : 0) + ')"></div>' +
@@ -2482,6 +2477,13 @@ window.addEventListener("hashchange", () => {
 
 /* ================== TỪ ĐIỂN TIẾNG NHẬT ================== */
 const JA = {
+"Chuyền đan": "編み立てライン",
+"Máy đang hỏng": "故障中の機械",
+"Đã cập nhật sản lượng hôm nay": "本日 生産数入力済み",
+"Sản lượng hôm nay": "本日の生産数",
+"Không có máy nào đang hỏng.": "故障中の機械はありません。",
+"Báo cáo sự cố chờ duyệt": "承認待ちの故障報告",
+"Ngừng sử dụng máy này": "この機械を使用停止",
 "Tải lại toàn bộ dữ liệu từ máy chủ? (chỉ cần khi dữ liệu hiển thị không đúng)": "サーバーから全データを再読み込みしますか？（表示がおかしい場合のみ）",
 "Đang tải lại dữ liệu…": "データを再読み込み中…",
 "Tải lại toàn bộ dữ liệu": "全データを再読み込み",
